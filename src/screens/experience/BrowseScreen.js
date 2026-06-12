@@ -2,9 +2,10 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, Text } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';  
 import { listExperiences } from '../../services/experienceService';
 import ExperienceCard from '../../components/experience/ExperienceCard';
-import { spacing } from '../../utils/theme';
+import { spacing, typography, colors } from '../../utils/theme';
 
 export default function BrowseScreen({ navigation }) {
   const [items, setItems] = useState([]);
@@ -36,29 +37,34 @@ export default function BrowseScreen({ navigation }) {
   if (loading) return <ActivityIndicator style={{ flex: 1 }} />;
 
   return (
-    <FlatList
-      data={items}
-      keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.list}
-      renderItem={({ item }) => (
-        <ExperienceCard
-          experience={item}
-          onPress={() => navigation.navigate('ExperienceDetail', { id: item.id })}
-        />
-      )}
-      onEndReached={loadMore}
-      onEndReachedThreshold={0.4}
-      ListFooterComponent={loadingMore ? <ActivityIndicator /> : null}
-      ListEmptyComponent={
-        <View style={styles.empty}>
-          <Text>Chưa có dữ liệu — hãy seed experiences vào Firestore</Text>
-        </View>
-      }
-    />
+    <SafeAreaView style={styles.safe} edges={['top']}>        
+      <Text style={styles.heading}>Khám phá 🧭</Text>            
+      <FlatList
+        data={items}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.list}
+        renderItem={({ item }) => (
+          <ExperienceCard
+            experience={item}
+            onPress={() => navigation.navigate('ExperienceDetail', { id: item.id })}
+          />
+        )}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={loadingMore ? <ActivityIndicator /> : null}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Text>Chưa có dữ liệu — hãy seed experiences vào Firestore</Text>
+          </View>
+        }
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { padding: spacing.md },
+  safe: { flex: 1, backgroundColor: colors.background },        // ← MỚI
+  heading: { ...typography.title, paddingHorizontal: spacing.md, paddingBottom: spacing.sm }, // ← MỚI
+  list: { padding: spacing.md, paddingTop: 0 },
   empty: { alignItems: 'center', marginTop: spacing.xl * 2 },
 });

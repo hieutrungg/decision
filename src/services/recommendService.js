@@ -7,8 +7,7 @@ import { db } from '../api/firebase';
 import { COLLECTIONS } from '../utils/constants';
 
 /** Query experiences theo mood + trần budget */
-async function fetchCandidates({ budget, mood }) {
-  // Cần composite index: mood (array-contains) + budget (<=) — tạo trong Firebase Console
+async function fetchCandidates({ budget, mood, timeSlot }) {
   const q = query(
     collection(db, COLLECTIONS.EXPERIENCES),
     where('mood', 'array-contains', mood),
@@ -16,7 +15,12 @@ async function fetchCandidates({ budget, mood }) {
     limit(30),
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+  // Lọc timeSlot ở CLIENT (Firestore chỉ cho 1 array-contains/query, đã dùng cho mood).
+  // Document không có field timeSlots = mở mọi khung giờ (tương thích data cũ).
+  if (!timeSlot) return all;
+  return all.filter((e) => !e.timeSlots || e.timeSlots.includes(timeSlot));
 }
 
 function pickRandom(arr) {
@@ -28,8 +32,8 @@ function pickRandom(arr) {
  * Ràng buộc: tổng budget <= budget, tổng duration <= duration.
  * @returns {Promise<{items: object[], totalBudget: number, totalDuration: number} | null>}
  */
-export async function generatePackage({ budget, duration, mood }) {
-  const candidates = await fetchCandidates({ budget, mood });
+export async function generatePackage({ budget, duration, mood, timeSlot }) {
+  const candidates = await fetchCandidates({ budget, mood, timeSlot });
   if (!candidates.length) return null;
 
   const byCat = (cat) => candidates.filter((e) => e.category === cat);
@@ -59,8 +63,8 @@ export async function generatePackage({ budget, duration, mood }) {
 }
 
 /** Shake to Discover — 1 experience ngẫu nhiên theo profile */
-export async function getRandomExperience({ budget = 500000, mood = 'relax' } = {}) {
-  const candidates = await fetchCandidates({ budget, mood });
+export async function getRandomExperience({ budget = 500000, mood = 'relax', timeSlot } = {}) {
+  const candidates = await fetchCandidates({ budget, mood, timeSlot });
   return pickRandom(candidates);
 }
 

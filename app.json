@@ -27,15 +27,16 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Cho phép Random Experience dùng vị trí để gợi ý địa điểm gần bạn."
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "extra": {
-      "firebaseApiKey": "YOUR_FIREBASE_API_KEY",
-      "firebaseAuthDomain": "YOUR_PROJECT.firebaseapp.com",
-      "firebaseProjectId": "YOUR_PROJECT_ID",
-      "firebaseStorageBucket": "YOUR_PROJECT.appspot.com",
-      "firebaseMessagingSenderId": "YOUR_SENDER_ID",
-      "firebaseAppId": "YOUR_APP_ID",
+      "firebaseApiKey": "AIzaSyAYdVOf5r3svtZLCOBn0I9GlBQSLGrBPtI",
+      "firebaseAuthDomain": "random-experience3.firebaseapp.com",
+      "firebaseProjectId": "random-experience3",
+      "firebaseStorageBucket": "random-experience3.firebasestorage.app",
+      "firebaseMessagingSenderId": "904804549544",
+      "firebaseAppId": "1:904804549544:web:d87ee02a453eaa0e19939d",
       "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY"
     }
   }

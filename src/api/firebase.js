@@ -1,7 +1,6 @@
 // src/api/firebase.js
-// Khởi tạo Firebase Web SDK (chạy được trong Expo Go, KHÔNG dùng @react-native-firebase)
 import { initializeApp, getApps } from 'firebase/app';
-import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import { initializeAuth, getAuth, getReactNativePersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,14 +17,20 @@ const firebaseConfig = {
   appId: extra.firebaseAppId,
 };
 
-// Tránh khởi tạo 2 lần khi Fast Refresh
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 
-// Auth với persistence qua AsyncStorage (giữ đăng nhập khi mở lại app)
-export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage),
-});
+// initializeAuth chỉ gọi được 1 lần; getReactNativePersistence có thể
+// undefined tùy cách Metro resolve — fallback về getAuth trong cả 2 trường hợp
+let auth;
+try {
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+  });
+} catch (e) {
+  auth = getAuth(app);
+}
 
+export { auth };
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export default app;

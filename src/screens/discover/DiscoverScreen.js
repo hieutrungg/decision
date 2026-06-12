@@ -1,7 +1,8 @@
 // [M2] Màn hình Discover — Shake to Discover + Smart Filter
 import React, { useCallback, useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { StyleSheet, ScrollView } from 'react-native';
 import { Text, Button, ActivityIndicator } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
 import { useShake } from '../../hooks/useShake';
 import { useRecommend } from '../../hooks/useRecommend';
@@ -10,30 +11,31 @@ import PackageCard from '../../components/experience/PackageCard';
 import ExperienceCard from '../../components/experience/ExperienceCard';
 import FilterBottomSheet from '../../components/common/FilterBottomSheet';
 import { spacing, typography, colors } from '../../utils/theme';
+import { getCurrentTimeSlot } from '../../utils/timeSlot';
 
-export default function DiscoverScreen() {
+export default function DiscoverScreen({ navigation }) {
+  const { pkg, single, loading, error, generate, randomOne } = useRecommend();
   const isFocused = useIsFocused();
   const { profile } = useUser();
-  const { pkg, single, loading, generate, randomOne } = useRecommend();
   const [filterVisible, setFilterVisible] = useState(false);
 
-  // Shake → random 1 experience theo preferences trong profile
   const onShake = useCallback(() => {
     randomOne({
       budget: profile?.preferences?.defaultBudget ?? 500000,
       mood: profile?.preferences?.defaultMood ?? 'relax',
+      timeSlot: getCurrentTimeSlot().key,
     });
   }, [profile, randomOne]);
 
-  useShake(onShake, isFocused); // chỉ lắng nghe khi đang ở màn hình này
+  useShake(onShake, isFocused);
 
   const onApplyFilter = (filters) => {
     setFilterVisible(false);
-    generate(filters); // → mini itinerary
+    generate(filters);
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>Tối nay làm gì? 🎲</Text>
         <Text style={styles.hint}>Lắc điện thoại để nhận gợi ý ngẫu nhiên</Text>
@@ -44,13 +46,23 @@ export default function DiscoverScreen() {
 
         {loading && <ActivityIndicator style={{ marginTop: spacing.xl }} />}
 
-        {/* Kết quả Shake: 1 experience */}
-        {!loading && single && <ExperienceCard experience={single} />}
+        {!loading && single && (
+          <ExperienceCard
+            experience={single}
+            onPress={() => navigation.navigate('ExperienceDetail', { id: single.id })}
+          />
+        )}
 
-        {/* Kết quả Smart Filter: mini itinerary */}
-        {!loading && pkg && <PackageCard pkg={pkg} />}
+        {!loading && pkg && (
+          <PackageCard
+            pkg={pkg}
+            onItemPress={(item) => navigation.navigate('ExperienceDetail', { id: item.id })}
+          />
+        )}
 
-        {!loading && !single && !pkg && (
+        {!loading && error && <Text style={styles.error}>⚠️ {error}</Text>}
+
+        {!loading && !single && !pkg && !error && (
           <Text style={styles.empty}>Chưa có gợi ý nào — lắc máy hoặc dùng Smart Filter nhé!</Text>
         )}
       </ScrollView>
@@ -60,15 +72,16 @@ export default function DiscoverScreen() {
         onClose={() => setFilterVisible(false)}
         onApply={onApplyFilter}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  scroll: { padding: spacing.lg, paddingTop: spacing.xl * 2 },
+  scroll: { padding: spacing.lg },
   title: { ...typography.title, marginBottom: spacing.xs },
   hint: { ...typography.caption, marginBottom: spacing.lg },
   filterBtn: { marginBottom: spacing.lg },
+  error: { color: colors.danger, textAlign: 'center', marginTop: spacing.xl },
   empty: { ...typography.caption, textAlign: 'center', marginTop: spacing.xl },
 });

@@ -17,6 +17,7 @@ export function useRecommend() {
       setPkg(result);
       return result;
     } catch (e) {
+      console.error('generatePackage error:', e);
       setError(e.message);
       return null;
     } finally {
@@ -32,6 +33,7 @@ export function useRecommend() {
       setSingle(result);
       return result;
     } catch (e) {
+      console.error('generatePackage error:', e);
       setError(e.message);
       return null;
     } finally {

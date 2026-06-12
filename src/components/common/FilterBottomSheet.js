@@ -5,14 +5,16 @@ import { Modal, StyleSheet, View, Pressable } from 'react-native';
 import { Text, Button, Chip } from 'react-native-paper';
 import { MOODS, BUDGET_PRESETS, DURATION_PRESETS } from '../../utils/constants';
 import { colors, spacing, typography, radius } from '../../utils/theme';
-
+import { TIME_SLOTS } from '../../utils/constants';
+import { getCurrentTimeSlot } from '../../utils/timeSlot';
 export default function FilterBottomSheet({ visible, onClose, onApply }) {
   const [budget, setBudget] = useState(BUDGET_PRESETS[1]);
   const [duration, setDuration] = useState(DURATION_PRESETS[1]);
   const [mood, setMood] = useState(MOODS[0]);
+  const [timeSlot, setTimeSlot] = useState(getCurrentTimeSlot());
 
   const apply = () => {
-    onApply({ budget: budget.max, duration: duration.minutes, mood: mood.key });
+    onApply({ budget: budget.max, duration: duration.minutes, mood: mood.key, timeSlot: timeSlot.key });
   };
 
   return (
@@ -47,7 +49,14 @@ export default function FilterBottomSheet({ visible, onClose, onApply }) {
             </Chip>
           ))}
         </View>
-
+        <Text style={styles.label}>🕐 Khung giờ (đang là {getCurrentTimeSlot().label})</Text>
+        <View style={styles.row}>
+          {TIME_SLOTS.map((t) => (
+            <Chip key={t.key} selected={timeSlot.key === t.key} onPress={() => setTimeSlot(t)}>
+              {t.emoji} {t.label}
+            </Chip>
+          ))}
+        </View>
         <Button mode="contained" onPress={apply} style={styles.applyBtn}>
           Gợi ý cho tôi 🎲
         </Button>
