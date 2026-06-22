@@ -1,14 +1,30 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import polyline from '@mapbox/polyline';
 import * as Location from 'expo-location';
 import { ActivityIndicator, Button, Text } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { getRoute } from '../../api/maps';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getRoute, haversineKm } from '../../api/maps';
 import { listExperiences } from '../../services/experienceService';
 import { DEFAULT_MAP_REGION } from '../../utils/constants';
 import { colors, spacing, typography } from '../../utils/theme';
+
+const CATEGORY_FILTERS = [
+  { key: 'all', label: 'Tat ca' },
+  { key: 'cafe', label: 'cafe' },
+  { key: 'workshop', label: 'workshop' },
+  { key: 'food', label: 'food' },
+  { key: 'entertainment', label: 'entertainment' },
+];
+
+const DISTANCE_FILTERS = [
+  { key: 'all', label: 'Tat ca', value: null },
+  { key: '1', label: '1 km', value: 1 },
+  { key: '3', label: '3 km', value: 3 },
+  { key: '5', label: '5 km', value: 5 },
+  { key: '10', label: '10 km', value: 10 },
+];
 
 function hasValidLocation(experience) {
   const lat = experience?.location?.lat;
@@ -54,9 +70,11 @@ function getFallbackPolyline(points) {
 }
 
 export default function MapScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets();
   const mapRef = useRef(null);
   const [region, setRegion] = useState(DEFAULT_MAP_REGION);
   const [markers, setMarkers] = useState([]);
+  const [userCoords, setUserCoords] = useState(null);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState('');
@@ -64,6 +82,9 @@ export default function MapScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [mapMode, setMapMode] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedDistance, setSelectedDistance] = useState('all');
+  const [activeFilter, setActiveFilter] = useState(null);
 
   const itineraryItems = route?.params?.itinerary;
   const routeMode = route?.params?.viewMode ?? 'all';
@@ -80,12 +101,50 @@ export default function MapScreen({ navigation, route }) {
     [itineraryItems],
   );
   const isItineraryMode = useMemo(() => mapMode === 'itinerary', [mapMode]);
+  const selectedDistanceValue = useMemo(
+    () => DISTANCE_FILTERS.find((item) => item.key === selectedDistance)?.value ?? null,
+    [selectedDistance],
+  );
+  const selectedCategoryLabel = useMemo(
+    () => CATEGORY_FILTERS.find((item) => item.key === selectedCategory)?.label ?? 'Tat ca',
+    [selectedCategory],
+  );
+  const selectedDistanceLabel = useMemo(
+    () => DISTANCE_FILTERS.find((item) => item.key === selectedDistance)?.label ?? 'Tat ca',
+    [selectedDistance],
+  );
+  const activeFilterOptions = useMemo(
+    () => (activeFilter === 'category' ? CATEGORY_FILTERS : DISTANCE_FILTERS),
+    [activeFilter],
+  );
+  const shouldWarnDistanceFilter = useMemo(
+    () => !isItineraryMode && selectedDistanceValue !== null && !userCoords,
+    [isItineraryMode, selectedDistanceValue, userCoords],
+  );
+  const displayedMarkers = useMemo(() => {
+    if (isItineraryMode) return markers;
+
+    return markers.filter((experience) => {
+      const matchesCategory = selectedCategory === 'all' || experience.category === selectedCategory;
+      if (!matchesCategory) return false;
+
+      if (selectedDistanceValue === null || !userCoords) return true;
+
+      const distance = haversineKm(
+        { lat: userCoords.latitude, lng: userCoords.longitude },
+        { lat: experience.location.lat, lng: experience.location.lng },
+      );
+
+      return distance <= selectedDistanceValue;
+    });
+  }, [isItineraryMode, markers, selectedCategory, selectedDistanceValue, userCoords]);
 
   const resolveBaseRegion = useCallback(async () => {
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== 'granted') {
         setPermissionDenied(true);
+        setUserCoords(null);
         return DEFAULT_MAP_REGION;
       }
 
@@ -93,16 +152,22 @@ export default function MapScreen({ navigation, route }) {
 
       try {
         const current = await Location.getCurrentPositionAsync({});
+        setUserCoords({
+          latitude: current.coords.latitude,
+          longitude: current.coords.longitude,
+        });
         return {
           ...DEFAULT_MAP_REGION,
           latitude: current.coords.latitude,
           longitude: current.coords.longitude,
         };
       } catch {
+        setUserCoords(null);
         return DEFAULT_MAP_REGION;
       }
     } catch {
       setPermissionDenied(true);
+      setUserCoords(null);
       return DEFAULT_MAP_REGION;
     }
   }, []);
@@ -114,6 +179,8 @@ export default function MapScreen({ navigation, route }) {
     setRouteCoordinates([]);
     setRouteError('');
     setRouteLoading(false);
+    setSelectedCategory('all');
+    setSelectedDistance('all');
 
     try {
       const [baseRegion, experienceResult] = await Promise.all([
@@ -138,6 +205,8 @@ export default function MapScreen({ navigation, route }) {
       setError('');
       setMapMode('itinerary');
       setRouteError('');
+      setSelectedCategory('all');
+      setSelectedDistance('all');
 
       try {
         const baseRegion = await resolveBaseRegion();
@@ -246,11 +315,51 @@ export default function MapScreen({ navigation, route }) {
     });
   }, [routeCoordinates]);
 
+  useEffect(() => {
+    if (isItineraryMode || !mapRef.current || displayedMarkers.length === 0) return;
+
+    const coordinates = displayedMarkers.map((experience) => ({
+      latitude: experience.location.lat,
+      longitude: experience.location.lng,
+    }));
+
+    mapRef.current.fitToCoordinates(coordinates, {
+      edgePadding: {
+        top: 180,
+        right: 80,
+        bottom: 80,
+        left: 80,
+      },
+      animated: true,
+    });
+  }, [displayedMarkers, isItineraryMode]);
+
   const openAllMap = () => {
     navigation.navigate('Map', {
       viewMode: 'all',
       refreshKey: Date.now(),
     });
+  };
+
+  const resetFilters = () => {
+    setSelectedCategory('all');
+    setSelectedDistance('all');
+  };
+
+  const closeFilterModal = () => {
+    setActiveFilter(null);
+  };
+
+  const applyFilterOption = (key) => {
+    if (activeFilter === 'category') {
+      setSelectedCategory(key);
+    }
+
+    if (activeFilter === 'distance') {
+      setSelectedDistance(key);
+    }
+
+    closeFilterModal();
   };
 
   if (loading) {
@@ -306,6 +415,12 @@ export default function MapScreen({ navigation, route }) {
         </View>
       ) : null}
 
+      {shouldWarnDistanceFilter ? (
+        <View style={styles.banner}>
+          <Text style={styles.bannerText}>Can quyen vi tri de loc theo khoang cach.</Text>
+        </View>
+      ) : null}
+
       {isItineraryMode && routeLoading ? (
         <View style={styles.banner}>
           <Text style={styles.bannerText}>Dang tai duong di goi y...</Text>
@@ -318,36 +433,83 @@ export default function MapScreen({ navigation, route }) {
         </View>
       ) : null}
 
-      <MapView ref={mapRef} style={styles.map} region={region} showsUserLocation={!permissionDenied}>
-        {routeCoordinates.length >= 2 ? (
-          <Polyline
-            coordinates={routeCoordinates}
-            strokeWidth={8}
-            strokeColor="#0000FF"
-            geodesic
-            zIndex={999}
-          />
-        ) : null}
+      {!isItineraryMode && markers.length > 0 && displayedMarkers.length === 0 ? (
+        <View style={styles.banner}>
+          <Text style={styles.bannerText}>Khong co dia diem nao phu hop voi bo loc hien tai.</Text>
+        </View>
+      ) : null}
 
-        {markers.map((experience) => (
-          <Marker
-            key={experience.id}
-            coordinate={{
-              latitude: experience.location.lat,
-              longitude: experience.location.lng,
-            }}
-            title={experience.title}
-            description={experience.location.address}
-            onPress={() => navigation.navigate('ExperienceDetail', { id: experience.id })}
-          />
-        ))}
-      </MapView>
+      <View style={styles.mapContainer}>
+        <MapView ref={mapRef} style={styles.map} region={region} showsUserLocation={!permissionDenied}>
+          {routeCoordinates.length >= 2 ? (
+            <Polyline
+              coordinates={routeCoordinates}
+              strokeWidth={8}
+              strokeColor="#0000FF"
+              geodesic
+              zIndex={999}
+            />
+          ) : null}
+
+          {displayedMarkers.map((experience) => (
+            <Marker
+              key={experience.id}
+              coordinate={{
+                latitude: experience.location.lat,
+                longitude: experience.location.lng,
+              }}
+              title={experience.title}
+              description={experience.location.address}
+              onPress={() => navigation.navigate('ExperienceDetail', { id: experience.id })}
+            />
+          ))}
+        </MapView>
+
+        {!isItineraryMode ? (
+          <View style={[styles.filterOverlay, { top: insets.top + spacing.sm }]}>
+            <View style={styles.filterBox}>
+              <Pressable style={styles.selectField} onPress={() => setActiveFilter('category')}>
+                <Text style={styles.selectLabel}>Loai dia diem</Text>
+                <Text style={styles.selectValue}>{selectedCategoryLabel}</Text>
+              </Pressable>
+
+              <Pressable style={styles.selectField} onPress={() => setActiveFilter('distance')}>
+                <Text style={styles.selectLabel}>Khoang cach</Text>
+                <Text style={styles.selectValue}>{selectedDistanceLabel}</Text>
+              </Pressable>
+
+              <Button mode="text" compact onPress={resetFilters} style={styles.resetButton}>
+                Dat lai
+              </Button>
+            </View>
+          </View>
+        ) : null}
+      </View>
+
+      <Modal visible={!!activeFilter} transparent animationType="fade" onRequestClose={closeFilterModal}>
+        <Pressable style={styles.modalBackdrop} onPress={closeFilterModal} />
+        <View style={styles.modalSheet}>
+          <Text style={styles.modalTitle}>
+            {activeFilter === 'category' ? 'Chon loai dia diem' : 'Chon khoang cach'}
+          </Text>
+          {activeFilterOptions.map((item) => (
+            <Pressable
+              key={item.key}
+              style={styles.modalOption}
+              onPress={() => applyFilterOption(item.key)}
+            >
+              <Text style={styles.modalOptionText}>{item.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  mapContainer: { flex: 1 },
   map: { flex: 1 },
   centered: {
     flex: 1,
@@ -378,5 +540,74 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
     textAlign: 'center',
+  },
+  filterOverlay: {
+    position: 'absolute',
+    left: spacing.md,
+    right: spacing.md,
+  },
+  filterBox: {
+    backgroundColor: colors.background,
+    borderRadius: 16,
+    padding: spacing.sm,
+    gap: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  selectField: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+  },
+  selectLabel: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginBottom: spacing.xs,
+  },
+  selectValue: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  resetButton: {
+    alignSelf: 'flex-end',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  modalSheet: {
+    position: 'absolute',
+    left: spacing.lg,
+    right: spacing.lg,
+    top: '28%',
+    backgroundColor: colors.background,
+    borderRadius: 16,
+    padding: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 8,
+  },
+  modalTitle: {
+    ...typography.subtitle,
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  modalOption: {
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalOptionText: {
+    ...typography.body,
+    color: colors.text,
   },
 });
