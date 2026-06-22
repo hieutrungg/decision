@@ -1,9 +1,11 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Polyline } from 'react-native-maps';
+import polyline from '@mapbox/polyline';
 import * as Location from 'expo-location';
 import { ActivityIndicator, Button, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { getRoute } from '../../api/maps';
 import { listExperiences } from '../../services/experienceService';
 import { DEFAULT_MAP_REGION } from '../../utils/constants';
 import { colors, spacing, typography } from '../../utils/theme';
@@ -44,9 +46,20 @@ function getRegionForItems(items, fallbackRegion = DEFAULT_MAP_REGION) {
   };
 }
 
+function getFallbackPolyline(points) {
+  return points.map((point) => ({
+    latitude: point.lat,
+    longitude: point.lng,
+  }));
+}
+
 export default function MapScreen({ navigation, route }) {
+  const mapRef = useRef(null);
   const [region, setRegion] = useState(DEFAULT_MAP_REGION);
   const [markers, setMarkers] = useState([]);
+  const [routeCoordinates, setRouteCoordinates] = useState([]);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState('');
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -56,7 +69,16 @@ export default function MapScreen({ navigation, route }) {
   const routeMode = route?.params?.viewMode ?? 'all';
   const itineraryKey = route?.params?.itineraryKey ?? 0;
   const refreshKey = route?.params?.refreshKey ?? 0;
-
+  const itineraryRouteKey = useMemo(
+    () =>
+      Array.isArray(itineraryItems)
+        ? itineraryItems
+            .filter(hasValidLocation)
+            .map((item) => `${item.id}:${item.location.lat},${item.location.lng}`)
+            .join('|')
+        : '',
+    [itineraryItems],
+  );
   const isItineraryMode = useMemo(() => mapMode === 'itinerary', [mapMode]);
 
   const resolveBaseRegion = useCallback(async () => {
@@ -89,6 +111,9 @@ export default function MapScreen({ navigation, route }) {
     setLoading(true);
     setError('');
     setMapMode('all');
+    setRouteCoordinates([]);
+    setRouteError('');
+    setRouteLoading(false);
 
     try {
       const [baseRegion, experienceResult] = await Promise.all([
@@ -112,12 +137,14 @@ export default function MapScreen({ navigation, route }) {
       setLoading(true);
       setError('');
       setMapMode('itinerary');
+      setRouteError('');
 
       try {
         const baseRegion = await resolveBaseRegion();
         const validMarkers = Array.isArray(items) ? items.filter(hasValidLocation) : [];
         setMarkers(validMarkers);
         setRegion(getRegionForItems(validMarkers, baseRegion));
+        setRouteCoordinates([]);
       } catch (e) {
         setMarkers([]);
         setError(e?.message || 'Khong mo duoc lich trinh tren ban do.');
@@ -136,6 +163,88 @@ export default function MapScreen({ navigation, route }) {
 
     loadAllExperiences();
   }, [itineraryItems, itineraryKey, loadAllExperiences, loadItinerary, refreshKey, routeMode]);
+
+  useEffect(() => {
+    if (routeMode !== 'itinerary') {
+      setRouteCoordinates([]);
+      setRouteError('');
+      setRouteLoading(false);
+      return;
+    }
+
+    const points = Array.isArray(itineraryItems)
+      ? itineraryItems
+          .filter(hasValidLocation)
+          .map((item) => ({ lat: item.location.lat, lng: item.location.lng }))
+      : [];
+
+    console.log('[MapScreen] points:', points);
+
+    if (points.length < 2) {
+      setRouteCoordinates([]);
+      setRouteError('');
+      setRouteLoading(false);
+      return;
+    }
+
+    let active = true;
+
+    const fetchPolyline = async () => {
+      setRouteLoading(true);
+      setRouteError('');
+
+      try {
+        const routeData = await getRoute(points);
+        const encoded = routeData.routes?.[0]?.overview_polyline?.points;
+        if (!encoded) {
+          throw new Error('Missing overview polyline');
+        }
+
+        const decoded = polyline.decode(encoded).map(([latitude, longitude]) => ({
+          latitude,
+          longitude,
+        }));
+
+        if (active) {
+          setRouteCoordinates(decoded);
+        }
+      } catch {
+        if (active) {
+          const fallbackCoordinates = getFallbackPolyline(points);
+          setRouteCoordinates(fallbackCoordinates);
+          setRouteError('Dang hien thi duong noi tam thoi.');
+        }
+      } finally {
+        if (active) {
+          setRouteLoading(false);
+        }
+      }
+    };
+
+    fetchPolyline();
+
+    return () => {
+      active = false;
+    };
+  }, [itineraryItems, itineraryRouteKey, routeMode]);
+
+  useEffect(() => {
+    console.log('[MapScreen] routeCoordinates:', routeCoordinates);
+  }, [routeCoordinates]);
+
+  useEffect(() => {
+    if (!mapRef.current || routeCoordinates.length < 2) return;
+
+    mapRef.current.fitToCoordinates(routeCoordinates, {
+      edgePadding: {
+        top: 80,
+        right: 80,
+        bottom: 80,
+        left: 80,
+      },
+      animated: true,
+    });
+  }, [routeCoordinates]);
 
   const openAllMap = () => {
     navigation.navigate('Map', {
@@ -197,7 +306,29 @@ export default function MapScreen({ navigation, route }) {
         </View>
       ) : null}
 
-      <MapView style={styles.map} region={region} showsUserLocation={!permissionDenied}>
+      {isItineraryMode && routeLoading ? (
+        <View style={styles.banner}>
+          <Text style={styles.bannerText}>Dang tai duong di goi y...</Text>
+        </View>
+      ) : null}
+
+      {isItineraryMode && routeError ? (
+        <View style={styles.banner}>
+          <Text style={styles.bannerText}>{routeError}</Text>
+        </View>
+      ) : null}
+
+      <MapView ref={mapRef} style={styles.map} region={region} showsUserLocation={!permissionDenied}>
+        {routeCoordinates.length >= 2 ? (
+          <Polyline
+            coordinates={routeCoordinates}
+            strokeWidth={8}
+            strokeColor="#0000FF"
+            geodesic
+            zIndex={999}
+          />
+        ) : null}
+
         {markers.map((experience) => (
           <Marker
             key={experience.id}
@@ -249,4 +380,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
