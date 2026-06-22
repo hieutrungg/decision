@@ -1,6 +1,4 @@
-// src/navigation/MainTabs.js
-// Root stack: Tabs + ExperienceDetail (modal dùng chung cho mọi tab)
-import React from 'react';
+﻿import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import DiscoverScreen from '../screens/discover/DiscoverScreen';
@@ -21,10 +19,23 @@ function Tabs() {
         tabBarActiveTintColor: colors.primary,
       }}
     >
-      <Tab.Screen name="Discover" component={DiscoverScreen} options={{ title: 'Gợi ý' }} />
-      <Tab.Screen name="Browse" component={BrowseScreen} options={{ title: 'Danh sách' }} />
-      <Tab.Screen name="Map" component={MapScreen} options={{ title: 'Bản đồ' }} />
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Cá nhân' }} />
+      <Tab.Screen name="Discover" component={DiscoverScreen} options={{ title: 'Goi y' }} />
+      <Tab.Screen name="Browse" component={BrowseScreen} options={{ title: 'Danh sach' }} />
+      <Tab.Screen
+        name="Map"
+        component={MapScreen}
+        initialParams={{ viewMode: 'all', refreshKey: 0 }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            navigation.navigate('Map', {
+              viewMode: 'all',
+              refreshKey: Date.now(),
+            });
+          },
+        })}
+        options={{ title: 'Ban do' }}
+      />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Ca nhan' }} />
     </Tab.Navigator>
   );
 }
@@ -36,8 +47,9 @@ export default function MainTabs() {
       <Stack.Screen
         name="ExperienceDetail"
         component={ExperienceDetailScreen}
-        options={{ presentation: 'modal', title: 'Chi tiết' }}
+        options={{ presentation: 'modal', title: 'Chi tiet' }}
       />
     </Stack.Navigator>
   );
 }
+

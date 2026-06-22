@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -16,57 +16,133 @@ function hasValidLocation(experience) {
   return Number.isFinite(lat) && Number.isFinite(lng) && typeof address === 'string' && address.trim().length > 0;
 }
 
-export default function MapScreen({ navigation }) {
+function getRegionForItems(items, fallbackRegion = DEFAULT_MAP_REGION) {
+  if (!items.length) return fallbackRegion;
+
+  if (items.length === 1) {
+    return {
+      ...fallbackRegion,
+      latitude: items[0].location.lat,
+      longitude: items[0].location.lng,
+      latitudeDelta: 0.03,
+      longitudeDelta: 0.03,
+    };
+  }
+
+  const lats = items.map((item) => item.location.lat);
+  const lngs = items.map((item) => item.location.lng);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+
+  return {
+    latitude: (minLat + maxLat) / 2,
+    longitude: (minLng + maxLng) / 2,
+    latitudeDelta: Math.max((maxLat - minLat) * 1.5, 0.03),
+    longitudeDelta: Math.max((maxLng - minLng) * 1.5, 0.03),
+  };
+}
+
+export default function MapScreen({ navigation, route }) {
   const [region, setRegion] = useState(DEFAULT_MAP_REGION);
   const [markers, setMarkers] = useState([]);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [mapMode, setMapMode] = useState('all');
 
-  const loadExperiences = useCallback(async () => {
+  const itineraryItems = route?.params?.itinerary;
+  const routeMode = route?.params?.viewMode ?? 'all';
+  const itineraryKey = route?.params?.itineraryKey ?? 0;
+  const refreshKey = route?.params?.refreshKey ?? 0;
+
+  const isItineraryMode = useMemo(() => mapMode === 'itinerary', [mapMode]);
+
+  const resolveBaseRegion = useCallback(async () => {
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== 'granted') {
+        setPermissionDenied(true);
+        return DEFAULT_MAP_REGION;
+      }
+
+      setPermissionDenied(false);
+
+      try {
+        const current = await Location.getCurrentPositionAsync({});
+        return {
+          ...DEFAULT_MAP_REGION,
+          latitude: current.coords.latitude,
+          longitude: current.coords.longitude,
+        };
+      } catch {
+        return DEFAULT_MAP_REGION;
+      }
+    } catch {
+      setPermissionDenied(true);
+      return DEFAULT_MAP_REGION;
+    }
+  }, []);
+
+  const loadAllExperiences = useCallback(async () => {
     setLoading(true);
     setError('');
+    setMapMode('all');
 
     try {
-      const [permissionResult, experienceResult] = await Promise.allSettled([
-        Location.requestForegroundPermissionsAsync(),
+      const [baseRegion, experienceResult] = await Promise.all([
+        resolveBaseRegion(),
         listExperiences({}, 50),
       ]);
 
-      if (permissionResult.status === 'fulfilled' && permissionResult.value.status === 'granted') {
-        try {
-          const current = await Location.getCurrentPositionAsync({});
-          setRegion({
-            ...DEFAULT_MAP_REGION,
-            latitude: current.coords.latitude,
-            longitude: current.coords.longitude,
-          });
-          setPermissionDenied(false);
-        } catch {
-          setRegion(DEFAULT_MAP_REGION);
-          setPermissionDenied(false);
-        }
-      } else {
-        setPermissionDenied(true);
-        setRegion(DEFAULT_MAP_REGION);
-      }
-
-      if (experienceResult.status !== 'fulfilled') {
-        throw experienceResult.reason;
-      }
-
-      setMarkers(experienceResult.value.items.filter(hasValidLocation));
+      const validMarkers = experienceResult.items.filter(hasValidLocation);
+      setMarkers(validMarkers);
+      setRegion(baseRegion);
     } catch (e) {
       setMarkers([]);
       setError(e?.message || 'Khong tai duoc du lieu dia diem luc nay.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [resolveBaseRegion]);
+
+  const loadItinerary = useCallback(
+    async (items) => {
+      setLoading(true);
+      setError('');
+      setMapMode('itinerary');
+
+      try {
+        const baseRegion = await resolveBaseRegion();
+        const validMarkers = Array.isArray(items) ? items.filter(hasValidLocation) : [];
+        setMarkers(validMarkers);
+        setRegion(getRegionForItems(validMarkers, baseRegion));
+      } catch (e) {
+        setMarkers([]);
+        setError(e?.message || 'Khong mo duoc lich trinh tren ban do.');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [resolveBaseRegion],
+  );
 
   useEffect(() => {
-    loadExperiences();
-  }, [loadExperiences]);
+    if (routeMode === 'itinerary') {
+      loadItinerary(itineraryItems);
+      return;
+    }
+
+    loadAllExperiences();
+  }, [itineraryItems, itineraryKey, loadAllExperiences, loadItinerary, refreshKey, routeMode]);
+
+  const openAllMap = () => {
+    navigation.navigate('Map', {
+      viewMode: 'all',
+      refreshKey: Date.now(),
+    });
+  };
 
   if (loading) {
     return (
@@ -81,8 +157,8 @@ export default function MapScreen({ navigation }) {
     return (
       <SafeAreaView style={styles.centered} edges={['top']}>
         <Text style={styles.stateTitle}>Chua tai duoc ban do</Text>
-        <Text style={styles.message}>Da xay ra loi khi lay du lieu experience. Vui long thu lai.</Text>
-        <Button mode="contained" onPress={loadExperiences}>
+        <Text style={styles.message}>Da xay ra loi khi lay du lieu dia diem. Vui long thu lai.</Text>
+        <Button mode="contained" onPress={isItineraryMode ? () => loadItinerary(itineraryItems) : loadAllExperiences}>
           Tai lai
         </Button>
       </SafeAreaView>
@@ -92,12 +168,16 @@ export default function MapScreen({ navigation }) {
   if (!markers.length) {
     return (
       <SafeAreaView style={styles.centered} edges={['top']}>
-        <Text style={styles.stateTitle}>Chua co dia diem de hien thi</Text>
-        <Text style={styles.message}>
-          Hien chua co experience nao co location hop le. Hay seed du lieu roi mo lai man hinh nay.
+        <Text style={styles.stateTitle}>
+          {isItineraryMode ? 'Lich trinh goi y chua co toa do hop le' : 'Chua co dia diem de hien thi'}
         </Text>
-        <Button mode="outlined" onPress={loadExperiences}>
-          Tai lai
+        <Text style={styles.message}>
+          {isItineraryMode
+            ? 'Cac item trong lich trinh nay chua co location hop le de dat marker.'
+            : 'Hien chua co experience nao co location hop le. Hay seed du lieu roi mo lai man hinh nay.'}
+        </Text>
+        <Button mode="outlined" onPress={isItineraryMode ? openAllMap : loadAllExperiences}>
+          {isItineraryMode ? 'Xem ban do chung' : 'Tai lai'}
         </Button>
       </SafeAreaView>
     );
@@ -105,6 +185,12 @@ export default function MapScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      {isItineraryMode ? (
+        <View style={styles.banner}>
+          <Text style={styles.bannerText}>Dang xem Lich trinh goi y</Text>
+        </View>
+      ) : null}
+
       {permissionDenied ? (
         <View style={styles.banner}>
           <Text style={styles.bannerText}>Khong co quyen vi tri, dang hien thi khu vuc Ha Noi mac dinh.</Text>
@@ -163,3 +249,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
