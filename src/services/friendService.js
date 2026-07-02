@@ -79,6 +79,11 @@ export async function getFollowers(userId) {
   const snap = await getDocs(collection(db, COLLECTIONS.FOLLOWERS, userId, 'items'));
   return snap.docs.map((d) => d.id);
 }
+/** Lấy profile 1 user theo uid — dùng để hiển thị tên/streak/avatar ở màn Following/FriendProfile */
+export async function getUserProfile(uid) {
+  const snap = await getDoc(doc(db, COLLECTIONS.USERS, uid));
+  return snap.exists() ? { uid: snap.id, ...snap.data() } : null;
+}
 
 /**
  * Search user theo displayNameLower (prefix search, field đã chốt ở họp đầu tuần).

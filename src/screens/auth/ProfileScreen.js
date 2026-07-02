@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../hooks/useAuth';
 import { useUser } from '../../context/UserContext';
 import { spacing, typography } from '../../utils/theme';
+import { getFollowing } from '../../services/friendService';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
@@ -27,10 +28,26 @@ export default function ProfileScreen() {
             <Text>🔥 Streak</Text>
           </Card.Content>
         </Card>
-        <Card style={styles.statCard}>
+        <Card style={styles.statCard} onPress={() => navigation.navigate('Completed')}>
           <Card.Content>
             <Text style={styles.statNumber}>{profile?.completedCount ?? 0}</Text>
             <Text>✅ Đã trải nghiệm</Text>
+          </Card.Content>
+        </Card>
+      </View>
+
+      {/* ← MỚI: chỉ số follow, chỉ đếm — bấm "Đang theo dõi" mở FollowingScreen */}
+      <View style={styles.statsRow}>
+        <Card style={styles.statCard} onPress={() => navigation.navigate('Following')}>
+          <Card.Content>
+            <Text style={styles.statNumber}>{profile?.followingCount ?? 0}</Text>
+            <Text>Đang theo dõi</Text>
+          </Card.Content>
+        </Card>
+        <Card style={styles.statCard}>
+          <Card.Content>
+            <Text style={styles.statNumber}>{profile?.followerCount ?? 0}</Text>
+            <Text>Người theo dõi</Text>
           </Card.Content>
         </Card>
       </View>
@@ -43,7 +60,26 @@ export default function ProfileScreen() {
       >
         Trải nghiệm đã hoàn thành
       </Button>
-      {/* TODO [M5]: danh sách achievement badges */}
+
+      <Button
+        mode="outlined"
+        icon="trophy"
+        onPress={() => navigation.navigate('Achievement')}
+        style={styles.completedBtn}
+      >
+        Thành tích
+      </Button>
+
+      {/* ← MỚI: mở màn tìm bạn */}
+      <Button
+        mode="outlined"
+        icon="account-search"
+        onPress={() => navigation.navigate('FindFriends')}
+        style={styles.completedBtn}
+      >
+        Tìm bạn
+      </Button>
+
       {/* TODO [M1]: chỉnh sửa preferences (defaultBudget, defaultMood) */}
 
       <Button mode="outlined" onPress={logout} style={styles.logout}>
@@ -56,8 +92,9 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center', paddingTop: spacing.xl * 2, padding: spacing.lg },
   name: { ...typography.subtitle, marginTop: spacing.md, marginBottom: spacing.lg },
-  statsRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.xl },
+  statsRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md },
   statCard: { flex: 1 },
   statNumber: { ...typography.title },
+  completedBtn: { alignSelf: 'stretch', marginBottom: spacing.sm },
   logout: { marginTop: 'auto', marginBottom: spacing.xl, alignSelf: 'stretch' },
 });
