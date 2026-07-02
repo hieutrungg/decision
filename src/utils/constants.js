@@ -30,11 +30,14 @@ export const COLLECTIONS = {
   BOOKMARKS: 'bookmarks',
   COMPLETED: 'completed',
   ACHIEVEMENTS: 'achievements',
+  // ← MỚI: cho friendService.js (follow 2 chiều)
+  FOLLOWING: 'following',
+  FOLLOWERS: 'followers',
 };
 export const TIME_SLOTS = [
-  { key: 'morning',   label: 'Sáng',      emoji: '🌅', from: 5,  to: 11 },
-  { key: 'noon',      label: 'Trưa',      emoji: '☀️', from: 11, to: 14 },
-  { key: 'afternoon', label: 'Chiều',     emoji: '🌤️', from: 14, to: 18 },
-  { key: 'evening',   label: 'Tối',       emoji: '🌆', from: 18, to: 23 },
-  { key: 'night',     label: 'Đêm muộn',  emoji: '🌙', from: 23, to: 5 },
+  { key: 'morning', label: 'Sáng', emoji: '🌅', from: 5, to: 11 },
+  { key: 'noon', label: 'Trưa', emoji: '☀️', from: 11, to: 14 },
+  { key: 'afternoon', label: 'Chiều', emoji: '🌤️', from: 14, to: 18 },
+  { key: 'evening', label: 'Tối', emoji: '🌆', from: 18, to: 23 },
+  { key: 'night', label: 'Đêm muộn', emoji: '🌙', from: 23, to: 5 },
 ];

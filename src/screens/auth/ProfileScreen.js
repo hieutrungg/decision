@@ -10,6 +10,7 @@ import { spacing, typography } from '../../utils/theme';
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const { profile } = useUser();
+  const navigation = useNavigation();
 
   return (
     <View style={styles.container}>
