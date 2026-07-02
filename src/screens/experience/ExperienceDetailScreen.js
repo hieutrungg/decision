@@ -5,7 +5,7 @@ import { Text, Button, ActivityIndicator, Chip } from 'react-native-paper';
 import { Image } from 'expo-image';
 import * as Location from 'expo-location';
 import { getExperienceById, toggleBookmark } from '../../services/experienceService';
-import { markCompleted, updateStreak } from '../../services/socialService';
+import { markCompleted, updateStreak, getLastCompleted } from '../../services/socialService';
 import { haversineKm } from '../../api/maps';
 import { useAuth } from '../../hooks/useAuth';
 import { spacing, typography, radius } from '../../utils/theme';
@@ -67,8 +67,14 @@ export default function ExperienceDetailScreen({ route }) {
         );
         return;
       }
+
+      // Đọc lastCompleted TRƯỚC khi ghi bản ghi mới, tránh lệch thứ tự do
+      // serverTimestamp() của bản ghi vừa thêm chưa resolve kịp.
+      const lastCompletedDate = await getLastCompleted(user.uid);
+
       await markCompleted(user.uid, id);
-      await updateStreak(user.uid, null);
+      await updateStreak(user.uid, lastCompletedDate);
+
       setCompleted(true);
       Alert.alert('Check-in thành công! 🎉', 'Streak của bạn đã được cập nhật.');
     } catch (e) {

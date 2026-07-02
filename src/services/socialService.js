@@ -8,6 +8,9 @@ import {
   updateDoc,
   increment,
   serverTimestamp,
+  query,
+  orderBy,
+  limit,
 } from 'firebase/firestore';
 import { db } from '../api/firebase';
 import { COLLECTIONS } from '../utils/constants';
@@ -28,22 +31,49 @@ export async function getCompleted(userId) {
 }
 
 /**
- * Cập nhật streak: nếu lần completed gần nhất là hôm qua → +1, cách >1 ngày → reset 1.
- * Đơn giản hóa: client tính, đủ cho demo (production sẽ cần Cloud Function).
+ * Lấy completedAt của lần check-in gần nhất (trước khi thêm bản ghi mới).
+ * Trả về Firestore Timestamp hoặc null nếu chưa từng check-in.
+ */
+export async function getLastCompleted(userId) {
+  const q = query(
+    collection(db, COLLECTIONS.COMPLETED, userId, 'items'),
+    orderBy('completedAt', 'desc'),
+    limit(1),
+  );
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  return snap.docs[0].data()?.completedAt ?? null;
+}
+
+/**
+ * Cập nhật streak dựa trên lastCompletedDate (đọc TRƯỚC khi ghi bản ghi mới).
+ * - Cách 1 ngày (hôm qua) → +1
+ * - Cùng ngày hôm nay → giữ nguyên
+ * - Cách >1 ngày, hoặc chưa từng check-in → reset về 1
  */
 export async function updateStreak(userId, lastCompletedDate) {
-  const today = new Date();
-  const diffDays = lastCompletedDate
-    ? Math.floor((today - lastCompletedDate) / (1000 * 60 * 60 * 24))
-    : null;
-
   const userRef = doc(db, COLLECTIONS.USERS, userId);
+
+  if (!lastCompletedDate) {
+    await updateDoc(userRef, { streak: 1 });
+    return;
+  }
+
+  const prevDate = lastCompletedDate.toDate ? lastCompletedDate.toDate() : lastCompletedDate;
+
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const now = new Date();
+  const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const prevMid = new Date(prevDate.getFullYear(), prevDate.getMonth(), prevDate.getDate());
+  const diffDays = Math.round((todayMid - prevMid) / MS_PER_DAY);
+
   if (diffDays === 1) {
     await updateDoc(userRef, { streak: increment(1) });
-  } else if (diffDays === null || diffDays > 1) {
+  } else if (diffDays === 0) {
+    // đã check-in hôm nay rồi (ở experience khác) — giữ nguyên
+  } else {
     await updateDoc(userRef, { streak: 1 });
   }
-  // diffDays === 0: đã tính hôm nay, không làm gì
 }
 
 export async function grantBadge(userId, badgeId, meta = {}) {
