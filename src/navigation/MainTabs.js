@@ -8,6 +8,7 @@ import BrowseScreen from '../screens/experience/BrowseScreen';
 import ExperienceDetailScreen from '../screens/experience/ExperienceDetailScreen';
 import MapScreen from '../screens/map/MapScreen';
 import ProfileScreen from '../screens/auth/ProfileScreen';
+import CompletedScreen from '../screens/social/CompletedScreen';
 import { colors } from '../utils/theme';
 
 const Tab = createBottomTabNavigator();
@@ -37,6 +38,11 @@ export default function MainTabs() {
         name="ExperienceDetail"
         component={ExperienceDetailScreen}
         options={{ presentation: 'modal', title: 'Chi tiết' }}
+      />
+      <Stack.Screen
+        name="Completed"
+        component={CompletedScreen}
+        options={{ title: 'Đã hoàn thành' }}
       />
     </Stack.Navigator>
   );

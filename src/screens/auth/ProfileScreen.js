@@ -2,6 +2,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text, Button, Avatar, Card } from 'react-native-paper';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../hooks/useAuth';
 import { useUser } from '../../context/UserContext';
 import { spacing, typography } from '../../utils/theme';
@@ -12,7 +13,10 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <Avatar.Text size={72} label={(profile?.displayName ?? user?.email ?? '?')[0].toUpperCase()} />
+      <Avatar.Text
+        size={72}
+        label={(profile?.displayName ?? user?.email ?? '?')[0].toUpperCase()}
+      />
       <Text style={styles.name}>{profile?.displayName || user?.email}</Text>
 
       <View style={styles.statsRow}>
@@ -30,6 +34,14 @@ export default function ProfileScreen() {
         </Card>
       </View>
 
+      <Button
+        mode="outlined"
+        icon="check-circle"
+        onPress={() => navigation.navigate('Completed')}
+        style={styles.completedBtn}
+      >
+        Trải nghiệm đã hoàn thành
+      </Button>
       {/* TODO [M5]: danh sách achievement badges */}
       {/* TODO [M1]: chỉnh sửa preferences (defaultBudget, defaultMood) */}
 
