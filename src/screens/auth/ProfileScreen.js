@@ -6,7 +6,6 @@ import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../hooks/useAuth';
 import { useUser } from '../../context/UserContext';
 import { spacing, typography } from '../../utils/theme';
-import { getFollowing } from '../../services/friendService';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
