@@ -6,8 +6,11 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import DiscoverScreen from '../screens/discover/DiscoverScreen';
 import BrowseScreen from '../screens/experience/BrowseScreen';
 import ExperienceDetailScreen from '../screens/experience/ExperienceDetailScreen';
+import WishlistScreen from '../screens/experience/WishlistScreen';
 import MapScreen from '../screens/map/MapScreen';
 import ProfileScreen from '../screens/auth/ProfileScreen';
+import EditPreferencesScreen from '../screens/auth/EditPreferencesScreen';
+import EditProfileScreen from '../screens/auth/EditProfileScreen';
 import { colors } from '../utils/theme';
 
 const Tab = createBottomTabNavigator();
@@ -24,6 +27,7 @@ function Tabs() {
       <Tab.Screen name="Discover" component={DiscoverScreen} options={{ title: 'Gợi ý' }} />
       <Tab.Screen name="Browse" component={BrowseScreen} options={{ title: 'Danh sách' }} />
       <Tab.Screen name="Map" component={MapScreen} options={{ title: 'Bản đồ' }} />
+      <Tab.Screen name="Wishlist" component={WishlistScreen} options={{ title: 'Đã lưu' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Cá nhân' }} />
     </Tab.Navigator>
   );
@@ -37,6 +41,16 @@ export default function MainTabs() {
         name="ExperienceDetail"
         component={ExperienceDetailScreen}
         options={{ presentation: 'modal', title: 'Chi tiết' }}
+      />
+      <Stack.Screen
+        name="EditPreferences"
+        component={EditPreferencesScreen}
+        options={{ title: 'Cài đặt sở thích' }}
+      />
+      <Stack.Screen
+        name="EditProfile"
+        component={EditProfileScreen}
+        options={{ title: 'Sửa hồ sơ' }}
       />
     </Stack.Navigator>
   );

@@ -18,6 +18,7 @@ export async function register(email, password, displayName) {
   await setDoc(doc(db, COLLECTIONS.USERS, cred.user.uid), {
     email,
     displayName: displayName ?? '',
+    displayNameLower: (displayName ?? '').toLowerCase(),
     avatar: '',
     preferences: { defaultBudget: 300000, defaultMood: 'relax' },
     streak: 0,

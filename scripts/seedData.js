@@ -1,12 +1,10 @@
 // scripts/seedData.js — chạy: node scripts/seedData.js
-const { initializeApp } = require('firebase/app');
-const { getFirestore, collection, addDoc } = require('firebase/firestore');
+// Cần file serviceAccountKey.json (tải từ Firebase Console → Project Settings →
+// Service accounts → Generate new private key). File này KHÔNG được commit.
+const admin = require('firebase-admin');
+const serviceAccount = require('./serviceAccountKey.json');
 
-const firebaseConfig = {
-  apiKey: 'AIzaSyAYdVOf5r3svtZLCOBn0I9GlBQSLGrBPtI',
-  authDomain: 'random-experience3.firebaseapp.com',
-  projectId: 'random-experience3',
-};
+admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 
 const SAMPLE = [
   {
@@ -66,16 +64,32 @@ const SAMPLE = [
   },
 ];
 
+// slug ổn định từ title để làm doc ID cố định → chạy lại chỉ ghi đè, không nhân bản
+function slugify(str) {
+  return str
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // bỏ dấu tiếng Việt
+    .replace(/đ/g, 'd')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 async function seed() {
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+  const db = admin.firestore();
+  const col = db.collection('experiences');
   for (const exp of SAMPLE) {
-    const ref = await addDoc(collection(db, 'experiences'), {
-      ...exp,
-      rating: 0,
-      createdAt: new Date(),
-    });
-    console.log('Đã thêm:', exp.title, '→', ref.id);
+    const id = slugify(exp.title);
+    await col.doc(id).set(
+      {
+        ...exp,
+        rating: 0,
+        createdBy: 'seed',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+    console.log('Đã ghi:', exp.title, '→', id);
   }
   console.log('Xong! Tổng:', SAMPLE.length);
   process.exit(0);

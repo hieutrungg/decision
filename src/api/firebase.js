@@ -1,5 +1,5 @@
 // src/api/firebase.js
-import { initializeApp, getApps } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { initializeAuth, getAuth, getReactNativePersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -17,18 +17,13 @@ const firebaseConfig = {
   appId: extra.firebaseAppId,
 };
 
-const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-// initializeAuth chỉ gọi được 1 lần; getReactNativePersistence có thể
-// undefined tùy cách Metro resolve — fallback về getAuth trong cả 2 trường hợp
-let auth;
-try {
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
-} catch (e) {
-  auth = getAuth(app);
-}
+const auth = getApps().length > 1
+  ? getAuth(app)
+  : initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
 
 export { auth };
 export const db = getFirestore(app);

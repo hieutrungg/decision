@@ -1,14 +1,15 @@
 // [M4] Chi tiết experience: ảnh, mô tả, rating, bookmark, chỉ đường, check-in
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View, Alert, Linking } from 'react-native';
-import { Text, Button, ActivityIndicator, Chip } from 'react-native-paper';
+import { Text, Button, ActivityIndicator, Chip, IconButton } from 'react-native-paper';
 import { Image } from 'expo-image';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import { getExperienceById, toggleBookmark } from '../../services/experienceService';
-import { markCompleted, updateStreak } from '../../services/socialService';
+import { getExperienceById, toggleBookmark, getBookmarks } from '../../services/experienceService';
+import { markCompleted, updateStreak, getCompleted } from '../../services/socialService';
 import { haversineKm } from '../../api/maps';
 import { useAuth } from '../../hooks/useAuth';
-import { spacing, typography, radius } from '../../utils/theme';
+import { spacing, typography, radius, colors, shadow } from '../../utils/theme';
 
 const CHECKIN_RADIUS_KM = 0.5; // 500m
 
@@ -22,7 +23,10 @@ export default function ExperienceDetailScreen({ route }) {
 
   useEffect(() => {
     getExperienceById(id).then(setExp);
-  }, [id]);
+    // Restore persisted bookmark + check-in state
+    getBookmarks(user.uid).then((ids) => setBookmarked(ids.includes(id)));
+    getCompleted(user.uid).then((list) => setCompleted(list.some((c) => c.expId === id)));
+  }, [id, user.uid]);
 
   if (!exp) return <ActivityIndicator style={{ flex: 1 }} />;
 
@@ -79,56 +83,101 @@ export default function ExperienceDetailScreen({ route }) {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {exp.images?.[0] && <Image source={exp.images[0]} style={styles.image} contentFit="cover" />}
-      <Text style={styles.title}>{exp.title}</Text>
+    <View style={styles.flex}>
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        {/* Hero ảnh tràn viền + bookmark nổi */}
+        <View style={styles.hero}>
+          {exp.images?.[0] ? (
+            <Image source={exp.images[0]} style={styles.image} contentFit="cover" />
+          ) : (
+            <View style={[styles.image, styles.imageFallback]}>
+              <Text style={styles.fallbackEmoji}>🗺️</Text>
+            </View>
+          )}
+          <SafeAreaView style={styles.heroActions} edges={['top']}>
+            <IconButton
+              icon={bookmarked ? 'bookmark' : 'bookmark-outline'}
+              mode="contained"
+              iconColor={bookmarked ? colors.primary : colors.text}
+              containerColor={colors.background}
+              size={24}
+              onPress={onBookmark}
+              style={styles.bookmarkBtn}
+            />
+          </SafeAreaView>
+        </View>
 
-      <View style={styles.row}>
-        <Chip icon="tag">{exp.category}</Chip>
-        <Chip icon="cash">{(exp.budget / 1000).toFixed(0)}k</Chip>
-        <Chip icon="clock">{exp.duration} phút</Chip>
-        <Chip icon="star">{exp.rating?.toFixed(1) ?? '—'}</Chip>
-      </View>
+        <View style={styles.body}>
+          <Text style={styles.title}>{exp.title}</Text>
 
-      <Text style={styles.desc}>{exp.description}</Text>
-      <Text style={styles.address}>📍 {exp.location?.address}</Text>
+          <View style={styles.row}>
+            <Chip icon="tag" compact style={styles.chip}>{exp.category}</Chip>
+            <Chip icon="cash" compact style={styles.chip}>{(exp.budget / 1000).toFixed(0)}k</Chip>
+            <Chip icon="clock-outline" compact style={styles.chip}>{exp.duration} phút</Chip>
+            <Chip icon="star" compact style={styles.chip}>{exp.rating?.toFixed(1) ?? '—'}</Chip>
+          </View>
 
-      {/* ← MỚI: nút chỉ đường */}
-      <Button mode="contained" icon="map-marker-radius" onPress={openDirections}>
-        Chỉ đường trên Google Maps
-      </Button>
+          <Text style={styles.desc}>{exp.description}</Text>
 
-      <Button
-        mode={bookmarked ? 'contained' : 'outlined'}
-        icon="bookmark"
-        onPress={onBookmark}
-        style={styles.btn}
-      >
-        {bookmarked ? 'Đã lưu' : 'Lưu vào Wishlist'}
-      </Button>
+          <View style={styles.addressRow}>
+            <Text style={styles.address}>📍 {exp.location?.address ?? 'Chưa có địa chỉ'}</Text>
+          </View>
 
-      <Button
-        mode="outlined"
-        icon="map-marker-check"
-        onPress={onCheckIn}
-        loading={checkingIn}
-        disabled={completed}
-        style={styles.btn}
-      >
-        {completed ? '✅ Đã trải nghiệm' : 'Check-in tại đây'}
-      </Button>
+          <Button
+            mode={completed ? 'contained' : 'outlined'}
+            icon="map-marker-check"
+            onPress={onCheckIn}
+            loading={checkingIn}
+            disabled={completed}
+            style={styles.checkinBtn}
+          >
+            {completed ? '✅ Đã trải nghiệm' : 'Check-in tại đây'}
+          </Button>
 
-      {/* TODO [M4]: danh sách review + form viết review */}
-    </ScrollView>
+          {/* TODO [M4]: danh sách review + form viết review */}
+        </View>
+      </ScrollView>
+
+      {/* Thanh hành động cố định ở đáy */}
+      <SafeAreaView style={styles.bottomBar} edges={['bottom']}>
+        <Button
+          mode="contained"
+          icon="map-marker-radius"
+          onPress={openDirections}
+          style={styles.directionsBtn}
+          contentStyle={styles.directionsContent}
+        >
+          Chỉ đường trên Google Maps
+        </Button>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.lg, paddingBottom: spacing.xl * 2 },
-  image: { width: '100%', height: 200, borderRadius: radius.md, marginBottom: spacing.md },
-  title: { ...typography.title, marginBottom: spacing.sm },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
-  desc: { ...typography.body, marginBottom: spacing.md },
-  address: { ...typography.caption, marginBottom: spacing.lg },
-  btn: { marginTop: spacing.sm },
+  flex: { flex: 1, backgroundColor: colors.background },
+  container: { paddingBottom: spacing.xl * 2 },
+  hero: { position: 'relative' },
+  image: { width: '100%', height: 260 },
+  imageFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  fallbackEmoji: { fontSize: 56 },
+  heroActions: { position: 'absolute', top: 0, right: 0, padding: spacing.sm },
+  bookmarkBtn: { ...shadow.sm },
+  body: { padding: spacing.lg },
+  title: { ...typography.title, marginBottom: spacing.md },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
+  chip: { backgroundColor: colors.surface },
+  desc: { ...typography.body, lineHeight: 22, marginBottom: spacing.lg },
+  addressRow: { marginBottom: spacing.lg },
+  address: { ...typography.caption, lineHeight: 18 },
+  checkinBtn: { marginTop: spacing.sm, borderRadius: radius.full },
+  bottomBar: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    backgroundColor: colors.background,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  directionsBtn: { borderRadius: radius.full },
+  directionsContent: { paddingVertical: spacing.xs },
 });

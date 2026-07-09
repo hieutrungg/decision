@@ -42,6 +42,24 @@ export const typography = {
   caption: { fontSize: 12, fontWeight: '400', color: colors.textMuted },
 };
 
+// Đổ bóng mềm cho card/nút nổi — dùng chung để tránh giao diện "phẳng".
+export const shadow = {
+  sm: {
+    shadowColor: '#1A1A2E',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  md: {
+    shadowColor: '#1A1A2E',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 5,
+  },
+};
+
 // Theme cho react-native-paper
 export const paperTheme = {
   ...MD3LightTheme,
