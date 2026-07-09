@@ -1,18 +1,12 @@
-// src/api/maps.js
-// Gọi Google Maps Web APIs (Directions) bằng fetch — không cần thư viện riêng.
-// LƯU Ý quota: cache kết quả, chỉ gọi khi user xem route.
 import Constants from 'expo-constants';
 
 const API_KEY = Constants.expoConfig?.extra?.googleMapsApiKey;
 const BASE = 'https://maps.googleapis.com/maps/api';
 
-/**
- * Lấy route đi qua các điểm của một mini itinerary.
- * @param {{lat:number,lng:number}[]} points - tối thiểu 2 điểm
- * @returns {Promise<object>} raw Directions API response
- */
 export async function getRoute(points) {
-  if (!points || points.length < 2) throw new Error('Cần ít nhất 2 điểm');
+  if (!points || points.length < 2) throw new Error('Need at least 2 points');
+  if (!API_KEY) throw new Error('Missing Google Maps API key');
+
   const origin = `${points[0].lat},${points[0].lng}`;
   const destination = `${points[points.length - 1].lat},${points[points.length - 1].lng}`;
   const waypoints = points
@@ -26,11 +20,16 @@ export async function getRoute(points) {
     `&mode=driving&key=${API_KEY}`;
 
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Directions API lỗi: ${res.status}`);
-  return res.json();
+  if (!res.ok) throw new Error(`Directions request failed with status ${res.status}`);
+
+  const data = await res.json();
+  if (data.status !== 'OK' || !data.routes?.length) {
+    throw new Error('Directions API returned no route');
+  }
+
+  return data;
 }
 
-/** Tính khoảng cách đường chim bay (km) — dùng để lọc "gần nhà" không tốn quota */
 export function haversineKm(a, b) {
   const R = 6371;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
