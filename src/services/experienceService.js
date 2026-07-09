@@ -85,3 +85,15 @@ export async function getReviews(expId, max = 20) {
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
+
+/** Lấy các review MÀ userId đã viết (khác getReviews — lọc theo expId) */
+export async function getReviewsByUser(userId, max = 20) {
+  const q = query(
+    collection(db, COLLECTIONS.REVIEWS),
+    where('userId', '==', userId),
+    orderBy('createdAt', 'desc'),
+    limit(max),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}

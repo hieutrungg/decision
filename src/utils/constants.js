@@ -30,6 +30,9 @@ export const COLLECTIONS = {
   BOOKMARKS: 'bookmarks',
   COMPLETED: 'completed',
   ACHIEVEMENTS: 'achievements',
+  // ← MỚI: cho friendService.js (follow 2 chiều)
+  FOLLOWING: 'following',
+  FOLLOWERS: 'followers',
 };
 
 export const DEFAULT_MAP_REGION = {
