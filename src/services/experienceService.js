@@ -98,6 +98,11 @@ export async function getBookmarks(userId) {
   return snap.docs.map((d) => d.id); // danh sách expId
 }
 
+/**
+ * Thêm review + cập nhật rating trung bình trên experience.
+ * Công thức tăng dần: newAvg = (avg × count + rating) / (count + 1)
+ * (rules cho phép user thường update riêng 2 field rating/reviewCount)
+ */
 export async function addReview(expId, userId, rating, comment) {
   const ref = await addDoc(collection(db, COLLECTIONS.REVIEWS), {
     expId,
@@ -106,6 +111,16 @@ export async function addReview(expId, userId, rating, comment) {
     comment,
     createdAt: serverTimestamp(),
   });
+
+  const expRef = doc(db, COLLECTIONS.EXPERIENCES, expId);
+  const expSnap = await getDoc(expRef);
+  if (expSnap.exists()) {
+    const { rating: avg = 0, reviewCount: count = 0 } = expSnap.data();
+    await updateDoc(expRef, {
+      rating: Math.round(((avg * count + rating) / (count + 1)) * 10) / 10,
+      reviewCount: count + 1,
+    });
+  }
   return ref.id;
 }
 

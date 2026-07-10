@@ -6,6 +6,7 @@ import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { getExperienceById, toggleBookmark, getBookmarks } from '../../services/experienceService';
+import ReviewSection from '../../components/experience/ReviewSection';
 import {
   markCompleted,
   updateStreak,
@@ -153,7 +154,12 @@ export default function ExperienceDetailScreen({ route }) {
             {completed ? '✅ Đã trải nghiệm' : 'Check-in tại đây'}
           </Button>
 
-          {/* TODO [M4]: danh sách review + form viết review */}
+          {/* [M4] Review + rating */}
+          <ReviewSection
+            expId={id}
+            userId={user.uid}
+            onReviewAdded={() => getExperienceById(id).then(setExp)}
+          />
         </View>
       </ScrollView>
 
