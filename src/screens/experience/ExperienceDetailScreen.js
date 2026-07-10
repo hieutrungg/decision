@@ -5,7 +5,12 @@ import { Text, Button, ActivityIndicator, Chip, IconButton } from 'react-native-
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import { getExperienceById, toggleBookmark, getBookmarks } from '../../services/experienceService';
+import {
+  getExperienceById,
+  toggleBookmark,
+  getBookmarks,
+  deleteExperience,
+} from '../../services/experienceService';
 import ReviewSection from '../../components/experience/ReviewSection';
 import {
   markCompleted,
@@ -20,7 +25,7 @@ import { spacing, typography, radius, colors, shadow } from '../../utils/theme';
 
 const CHECKIN_RADIUS_KM = 0.5; // 500m
 
-export default function ExperienceDetailScreen({ route }) {
+export default function ExperienceDetailScreen({ route, navigation }) {
   const { id } = route.params;
   const { user } = useAuth();
   const [exp, setExp] = useState(null);
@@ -33,6 +38,9 @@ export default function ExperienceDetailScreen({ route }) {
     // Restore persisted bookmark + check-in state
     getBookmarks(user.uid).then((ids) => setBookmarked(ids.includes(id)));
     getCompleted(user.uid).then((list) => setCompleted(list.some((c) => c.expId === id)));
+    // Reload khi quay lại từ màn Sửa để thấy thay đổi ngay
+    const unsub = navigation.addListener('focus', () => getExperienceById(id).then(setExp));
+    return unsub;
   }, [id, user.uid]);
 
   if (!exp) return <ActivityIndicator style={{ flex: 1 }} />;
@@ -102,6 +110,24 @@ export default function ExperienceDetailScreen({ route }) {
     }
   };
 
+  const onDelete = () => {
+    Alert.alert('Xóa experience?', 'Hành động này không thể hoàn tác.', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Xóa',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteExperience(id);
+            navigation.goBack();
+          } catch (e) {
+            Alert.alert('Lỗi', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <View style={styles.flex}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
@@ -154,6 +180,29 @@ export default function ExperienceDetailScreen({ route }) {
             {completed ? '✅ Đã trải nghiệm' : 'Check-in tại đây'}
           </Button>
 
+          {/* [M4] Sửa/Xóa — chỉ creator thấy (firestore.rules cũng enforce) */}
+          {exp.createdBy === user.uid && (
+            <View style={styles.ownerRow}>
+              <Button
+                mode="outlined"
+                icon="pencil"
+                onPress={() => navigation.navigate('ExperienceForm', { id })}
+                style={styles.ownerBtn}
+              >
+                Sửa
+              </Button>
+              <Button
+                mode="outlined"
+                icon="delete"
+                textColor={colors.danger}
+                onPress={onDelete}
+                style={styles.ownerBtn}
+              >
+                Xóa
+              </Button>
+            </View>
+          )}
+
           {/* [M4] Review + rating */}
           <ReviewSection
             expId={id}
@@ -196,6 +245,8 @@ const styles = StyleSheet.create({
   addressRow: { marginBottom: spacing.lg },
   address: { ...typography.caption, lineHeight: 18 },
   checkinBtn: { marginTop: spacing.sm, borderRadius: radius.full },
+  ownerRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  ownerBtn: { flex: 1 },
   bottomBar: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
