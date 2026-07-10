@@ -112,6 +112,10 @@ export async function getGrantedBadges(userId) {
   return map;
 }
 
+export async function getUserBadges(userId) {
+  return getGrantedBadges(userId);
+}
+
 /**
  * Chấm điều kiện toàn bộ BADGES dựa trên context hiện tại, cấp badge nào
  * đủ điều kiện mà chưa có. Gọi sau mỗi check-in thành công.

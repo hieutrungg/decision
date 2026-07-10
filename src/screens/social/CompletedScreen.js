@@ -21,26 +21,39 @@ export default function CompletedScreen() {
   const navigation = useNavigation();
   const [items, setItems] = useState(null); // null = loading lần đầu
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
-    const completed = await getCompleted(user.uid); // [{ expId, completedAt }]
+    if (!user?.uid) {
+      setItems([]);
+      setError(null);
+      return;
+    }
 
-    // map song song sang chi tiết experience, bỏ qua nếu experience đã bị xoá
-    const withDetails = await Promise.all(
-      completed.map(async (c) => {
-        const exp = await getExperienceById(c.expId);
-        return exp ? { ...c, exp } : null;
-      }),
-    );
+    try {
+      setError(null);
+      const completed = await getCompleted(user.uid); // [{ expId, completedAt }]
 
-    const sorted = withDetails.filter(Boolean).sort((a, b) => {
-      const at = a.completedAt?.toDate ? a.completedAt.toDate() : new Date(a.completedAt ?? 0);
-      const bt = b.completedAt?.toDate ? b.completedAt.toDate() : new Date(b.completedAt ?? 0);
-      return bt - at; // mới nhất trước
-    });
+      // map song song sang chi tiết experience, bỏ qua nếu experience đã bị xoá
+      const withDetails = await Promise.all(
+        completed.map(async (c) => {
+          const exp = await getExperienceById(c.expId);
+          return exp ? { ...c, exp } : null;
+        }),
+      );
 
-    setItems(sorted);
-  }, [user.uid]);
+      const sorted = withDetails.filter(Boolean).sort((a, b) => {
+        const at = a.completedAt?.toDate ? a.completedAt.toDate() : new Date(a.completedAt ?? 0);
+        const bt = b.completedAt?.toDate ? b.completedAt.toDate() : new Date(b.completedAt ?? 0);
+        return bt - at; // mới nhất trước
+      });
+
+      setItems(sorted);
+    } catch (e) {
+      setItems([]);
+      setError('Không tải được lịch sử trải nghiệm. Vui lòng thử lại sau.');
+    }
+  }, [user?.uid]);
 
   useEffect(() => {
     load();
@@ -59,7 +72,9 @@ export default function CompletedScreen() {
   if (items.length === 0) {
     return (
       <View style={styles.center}>
-        <Text style={typography.body}>Bạn chưa hoàn thành trải nghiệm nào cả 🌱</Text>
+        <Text style={typography.body}>
+          {error ?? 'Bạn chưa hoàn thành trải nghiệm nào cả 🌱'}
+        </Text>
       </View>
     );
   }

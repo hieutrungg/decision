@@ -23,6 +23,15 @@ async function fetchCandidates({ budget, mood, timeSlot }) {
   return all.filter((e) => !e.timeSlots || e.timeSlots.includes(timeSlot));
 }
 
+async function fetchCandidatesWithFallback(filters) {
+  const exactCandidates = await fetchCandidates(filters);
+  if (exactCandidates.length || !filters.timeSlot) {
+    return exactCandidates;
+  }
+
+  return fetchCandidates({ ...filters, timeSlot: undefined });
+}
+
 function pickRandom(arr) {
   return arr.length ? arr[Math.floor(Math.random() * arr.length)] : null;
 }
@@ -33,7 +42,7 @@ function pickRandom(arr) {
  * @returns {Promise<{items: object[], totalBudget: number, totalDuration: number} | null>}
  */
 export async function generatePackage({ budget, duration, mood, timeSlot }) {
-  const candidates = await fetchCandidates({ budget, mood, timeSlot });
+  const candidates = await fetchCandidatesWithFallback({ budget, mood, timeSlot });
   if (!candidates.length) return null;
 
   const byCat = (cat) => candidates.filter((e) => e.category === cat);
@@ -53,8 +62,15 @@ export async function generatePackage({ budget, duration, mood, timeSlot }) {
     }
   }
 
-  // Cần ít nhất 2 hoạt động mới thành "mini itinerary"; nếu không, trả 1 gợi ý đơn
-  if (items.length === 0) return null;
+  if (items.length === 0) {
+    const fallback = pickRandom(candidates);
+    if (fallback) {
+      items.push(fallback);
+    }
+  }
+
+  if (!items.length) return null;
+
   return {
     items,
     totalBudget: items.reduce((s, e) => s + e.budget, 0),
@@ -64,7 +80,7 @@ export async function generatePackage({ budget, duration, mood, timeSlot }) {
 
 /** Shake to Discover — 1 experience ngẫu nhiên theo profile */
 export async function getRandomExperience({ budget = 500000, mood = 'relax', timeSlot } = {}) {
-  const candidates = await fetchCandidates({ budget, mood, timeSlot });
+  const candidates = await fetchCandidatesWithFallback({ budget, mood, timeSlot });
   return pickRandom(candidates);
 }
 

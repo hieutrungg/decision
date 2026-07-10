@@ -12,6 +12,7 @@ export function useRecommend() {
   const generate = useCallback(async (filters) => {
     setLoading(true);
     setError(null);
+    setSingle(null);
     try {
       const result = await recommendService.generatePackage(filters);
       setPkg(result);
@@ -28,6 +29,7 @@ export function useRecommend() {
   const randomOne = useCallback(async (filters) => {
     setLoading(true);
     setError(null);
+    setPkg(null);
     try {
       const result = await recommendService.getRandomExperience(filters);
       setSingle(result);

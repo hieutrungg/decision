@@ -25,8 +25,8 @@ export const BADGES = [
     check: (ctx) => ctx.streak >= 3,
   },
   {
-    id: 'category4',
-    title: 'Đa dạng trải nghiệm',
+    id: 'allCategory',
+    title: 'Đủ 4 category',
     description: 'Hoàn thành trải nghiệm ở 4 category khác nhau',
     icon: 'shape-outline',
     check: (ctx) => ctx.categories.size >= 4,

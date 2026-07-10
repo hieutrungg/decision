@@ -1,17 +1,43 @@
 // <FilterBottomSheet /> — chọn budget / time / mood, dùng chung (doc mục 9)
 // Bản đơn giản dùng Modal để chạy được ngay; có thể nâng cấp lên @gorhom/bottom-sheet sau.
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, StyleSheet, View, Pressable } from 'react-native';
 import { Text, Button, Chip } from 'react-native-paper';
 import { MOODS, BUDGET_PRESETS, DURATION_PRESETS } from '../../utils/constants';
 import { colors, spacing, typography, radius } from '../../utils/theme';
 import { TIME_SLOTS } from '../../utils/constants';
 import { getCurrentTimeSlot } from '../../utils/timeSlot';
-export default function FilterBottomSheet({ visible, onClose, onApply }) {
-  const [budget, setBudget] = useState(BUDGET_PRESETS[1]);
-  const [duration, setDuration] = useState(DURATION_PRESETS[1]);
-  const [mood, setMood] = useState(MOODS[0]);
-  const [timeSlot, setTimeSlot] = useState(getCurrentTimeSlot());
+
+function resolveBudgetPreset(value) {
+  return BUDGET_PRESETS.find((preset) => preset.max === value) ?? BUDGET_PRESETS[1];
+}
+
+function resolveDurationPreset(value) {
+  return DURATION_PRESETS.find((preset) => preset.minutes === value) ?? DURATION_PRESETS[1];
+}
+
+function resolveMoodPreset(value) {
+  return MOODS.find((preset) => preset.key === value) ?? MOODS[0];
+}
+
+function resolveTimeSlotPreset(value) {
+  return TIME_SLOTS.find((preset) => preset.key === value) ?? getCurrentTimeSlot();
+}
+
+export default function FilterBottomSheet({ visible, onClose, onApply, initialValues }) {
+  const [budget, setBudget] = useState(resolveBudgetPreset(initialValues?.budget));
+  const [duration, setDuration] = useState(resolveDurationPreset(initialValues?.duration));
+  const [mood, setMood] = useState(resolveMoodPreset(initialValues?.mood));
+  const [timeSlot, setTimeSlot] = useState(resolveTimeSlotPreset(initialValues?.timeSlot));
+
+  useEffect(() => {
+    if (!visible) return;
+
+    setBudget(resolveBudgetPreset(initialValues?.budget));
+    setDuration(resolveDurationPreset(initialValues?.duration));
+    setMood(resolveMoodPreset(initialValues?.mood));
+    setTimeSlot(resolveTimeSlotPreset(initialValues?.timeSlot));
+  }, [visible, initialValues]);
 
   const apply = () => {
     onApply({ budget: budget.max, duration: duration.minutes, mood: mood.key, timeSlot: timeSlot.key });
@@ -49,7 +75,7 @@ export default function FilterBottomSheet({ visible, onClose, onApply }) {
             </Chip>
           ))}
         </View>
-        <Text style={styles.label}>🕐 Khung giờ (đang là {getCurrentTimeSlot().label})</Text>
+        <Text style={styles.label}>🕐 Khung giờ (đang là {timeSlot.label})</Text>
         <View style={styles.row}>
           {TIME_SLOTS.map((t) => (
             <Chip key={t.key} selected={timeSlot.key === t.key} onPress={() => setTimeSlot(t)}>
