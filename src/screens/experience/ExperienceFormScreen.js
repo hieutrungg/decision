@@ -101,7 +101,7 @@ export default function ExperienceFormScreen({ route, navigation }) {
     setSaving(true);
     try {
       let imageUrl = existingImage;
-      if (imageUri) imageUrl = await uploadExperienceImage(imageUri, user.uid);
+      if (imageUri) imageUrl = await uploadExperienceImage(imageUri);
 
       const data = {
         title: title.trim(),

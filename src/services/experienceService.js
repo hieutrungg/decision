@@ -16,8 +16,8 @@ import {
   startAfter,
   serverTimestamp,
 } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../api/firebase';
+import { db } from '../api/firebase';
+import { uploadImageToCloudinary } from '../api/cloudinary';
 import { COLLECTIONS } from '../utils/constants';
 
 export async function createExperience(data) {
@@ -39,14 +39,9 @@ export async function deleteExperience(expId) {
   await deleteDoc(doc(db, COLLECTIONS.EXPERIENCES, expId));
 }
 
-/** Upload ảnh local (uri từ expo-image-picker) lên Firebase Storage, trả về download URL */
-export async function uploadExperienceImage(localUri, userId) {
-  const res = await fetch(localUri);
-  const blob = await res.blob();
-  const path = `experiences/${userId}_${Date.now()}.jpg`;
-  const ref = storageRef(storage, path);
-  await uploadBytes(ref, blob);
-  return getDownloadURL(ref);
+/** Upload ảnh local (uri từ expo-image-picker) lên Cloudinary, trả về URL ảnh đã host */
+export async function uploadExperienceImage(localUri) {
+  return uploadImageToCloudinary(localUri);
 }
 
 /** Experience do chính user tạo — sort client-side để khỏi cần composite index */
