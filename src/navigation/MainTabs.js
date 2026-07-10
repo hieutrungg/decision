@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import DiscoverScreen from '../screens/discover/DiscoverScreen';
 import BrowseScreen from '../screens/experience/BrowseScreen';
 import ExperienceDetailScreen from '../screens/experience/ExperienceDetailScreen';
+import ExperienceFormScreen from '../screens/experience/ExperienceFormScreen';
 import WishlistScreen from '../screens/experience/WishlistScreen';
 import MapScreen from '../screens/map/MapScreen';
 import ProfileScreen from '../screens/auth/ProfileScreen';
@@ -57,6 +58,11 @@ export default function MainTabs() {
         name="ExperienceDetail"
         component={ExperienceDetailScreen}
         options={{ presentation: 'modal', title: 'Chi tiết' }}
+      />
+      <Stack.Screen
+        name="ExperienceForm"
+        component={ExperienceFormScreen}
+        options={{ title: 'Tạo experience' }}
       />
       <Stack.Screen
         name="Completed"
