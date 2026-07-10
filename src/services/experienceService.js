@@ -7,6 +7,7 @@ import {
   getDoc,
   getDocs,
   setDoc,
+  updateDoc,
   deleteDoc,
   query,
   where,
@@ -15,16 +16,49 @@ import {
   startAfter,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '../api/firebase';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../api/firebase';
 import { COLLECTIONS } from '../utils/constants';
 
 export async function createExperience(data) {
   const ref = await addDoc(collection(db, COLLECTIONS.EXPERIENCES), {
     ...data,
     rating: 0,
+    reviewCount: 0,
     createdAt: serverTimestamp(),
   });
   return ref.id;
+}
+
+export async function updateExperience(expId, data) {
+  await updateDoc(doc(db, COLLECTIONS.EXPERIENCES, expId), data);
+}
+
+/** Chỉ creator mới xóa được (firestore.rules enforce). Reviews cũ giữ nguyên — chấp nhận trong scope đồ án. */
+export async function deleteExperience(expId) {
+  await deleteDoc(doc(db, COLLECTIONS.EXPERIENCES, expId));
+}
+
+/** Upload ảnh local (uri từ expo-image-picker) lên Firebase Storage, trả về download URL */
+export async function uploadExperienceImage(localUri, userId) {
+  const res = await fetch(localUri);
+  const blob = await res.blob();
+  const path = `experiences/${userId}_${Date.now()}.jpg`;
+  const ref = storageRef(storage, path);
+  await uploadBytes(ref, blob);
+  return getDownloadURL(ref);
+}
+
+/** Experience do chính user tạo — sort client-side để khỏi cần composite index */
+export async function listMyExperiences(userId) {
+  const q = query(
+    collection(db, COLLECTIONS.EXPERIENCES),
+    where('createdBy', '==', userId),
+  );
+  const snap = await getDocs(q);
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
 }
 
 export async function getExperienceById(id) {
