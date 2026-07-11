@@ -250,6 +250,8 @@ const styles = StyleSheet.create({
   bottomBar: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
+    // modal trên iOS không có safe-area inset dưới nên phải tự đệm, không thì nút bị cắt
+    paddingBottom: spacing.md,
     backgroundColor: colors.background,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
