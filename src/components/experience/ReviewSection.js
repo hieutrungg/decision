@@ -1,6 +1,6 @@
 // [M4] Danh sách review + form viết review — dùng trong ExperienceDetailScreen
-import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View, Alert } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { StyleSheet, View, Alert, Keyboard } from 'react-native';
 import { Text, TextInput, Button, IconButton, ActivityIndicator, Divider } from 'react-native-paper';
 import { addReview, getReviews } from '../../services/experienceService';
 import { colors, spacing, typography, radius } from '../../utils/theme';
@@ -23,12 +23,30 @@ function Stars({ value, size = 18, onChange }) {
   );
 }
 
-export default function ReviewSection({ expId, userId, onReviewAdded }) {
+export default function ReviewSection({ expId, userId, onReviewAdded, onNeedScroll }) {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [sending, setSending] = useState(false);
+  const formRef = useRef(null);
+  const inputFocused = useRef(false);
+
+  // Bàn phím mở xong thì đo lại: nếu form (cả nút Gửi) vẫn bị che thì nhờ parent cuộn bù.
+  // Phải tự đo vì màn Detail là modal — inset tự động của ScrollView tính lệch một đoạn.
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', (e) => {
+      if (!inputFocused.current) return;
+      // chờ ScrollView cuộn tự động xong rồi mới đo, tránh đo giữa chừng animation
+      setTimeout(() => {
+        formRef.current?.measureInWindow((x, y, w, h) => {
+          const overlap = y + h - e.endCoordinates.screenY;
+          if (overlap > 0) onNeedScroll?.(overlap + spacing.md);
+        });
+      }, 100);
+    });
+    return () => sub.remove();
+  }, [onNeedScroll]);
 
   const load = useCallback(async () => {
     const list = await getReviews(expId);
@@ -65,7 +83,7 @@ export default function ReviewSection({ expId, userId, onReviewAdded }) {
       {alreadyReviewed ? (
         <Text style={styles.reviewed}>✅ Bạn đã đánh giá experience này</Text>
       ) : (
-        <View style={styles.form}>
+        <View style={styles.form} ref={formRef}>
           <Stars value={rating} size={26} onChange={setRating} />
           <TextInput
             placeholder="Chia sẻ trải nghiệm của bạn..."
@@ -75,6 +93,8 @@ export default function ReviewSection({ expId, userId, onReviewAdded }) {
             multiline
             dense
             style={styles.input}
+            onFocus={() => (inputFocused.current = true)}
+            onBlur={() => (inputFocused.current = false)}
           />
           <Button mode="contained" onPress={onSubmit} loading={sending} disabled={sending}>
             Gửi đánh giá
