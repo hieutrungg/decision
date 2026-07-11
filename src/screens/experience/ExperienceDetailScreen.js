@@ -1,6 +1,6 @@
 // [M4] Chi tiết experience: ảnh, mô tả, rating, bookmark, chỉ đường, check-in
 import React, { useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View, Alert, Linking, Platform } from 'react-native';
+import { ScrollView, StyleSheet, View, Alert, Linking, Platform, Keyboard } from 'react-native';
 import { Text, Button, ActivityIndicator, Chip, IconButton } from 'react-native-paper';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -34,6 +34,17 @@ export default function ExperienceDetailScreen({ route, navigation }) {
   const [completed, setCompleted] = useState(false);
   const scrollRef = useRef(null);
   const scrollOffsetY = useRef(0);
+  // đệm thêm dưới đáy khi mở bàn phím để có chỗ cuộn cả nút Gửi lên (modal tính inset bị hụt)
+  const [kbPad, setKbPad] = useState(0);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKbPad(spacing.xl * 4));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbPad(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   useEffect(() => {
     getExperienceById(id).then(setExp);
@@ -134,7 +145,7 @@ export default function ExperienceDetailScreen({ route, navigation }) {
     <View style={styles.flex}>
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, kbPad > 0 && { paddingBottom: kbPad }]}
         showsVerticalScrollIndicator={false}
         // đẩy nội dung lên khi mở bàn phím, không che ô nhập review (iOS)
         automaticallyAdjustKeyboardInsets

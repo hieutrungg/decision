@@ -41,7 +41,7 @@ export default function ReviewSection({ expId, userId, onReviewAdded, onNeedScro
       setTimeout(() => {
         formRef.current?.measureInWindow((x, y, w, h) => {
           const overlap = y + h - e.endCoordinates.screenY;
-          if (overlap > 0) onNeedScroll?.(overlap + spacing.md);
+          if (overlap > 0) onNeedScroll?.(overlap + spacing.lg);
         });
       }, 100);
     });
