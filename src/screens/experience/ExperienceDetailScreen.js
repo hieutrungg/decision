@@ -1,6 +1,6 @@
 // [M4] Chi tiết experience: ảnh, mô tả, rating, bookmark, chỉ đường, check-in
-import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View, Alert, Linking } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ScrollView, StyleSheet, View, Alert, Linking, Platform } from 'react-native';
 import { Text, Button, ActivityIndicator, Chip, IconButton } from 'react-native-paper';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,6 +32,8 @@ export default function ExperienceDetailScreen({ route, navigation }) {
   const [bookmarked, setBookmarked] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const scrollRef = useRef(null);
+  const scrollOffsetY = useRef(0);
 
   useEffect(() => {
     getExperienceById(id).then(setExp);
@@ -131,12 +133,17 @@ export default function ExperienceDetailScreen({ route, navigation }) {
   return (
     <View style={styles.flex}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
         // đẩy nội dung lên khi mở bàn phím, không che ô nhập review (iOS)
         automaticallyAdjustKeyboardInsets
         // cho phép bấm nút Gửi ngay cả khi bàn phím đang mở
         keyboardShouldPersistTaps="handled"
+        onScroll={(e) => {
+          scrollOffsetY.current = e.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={16}
       >
         {/* Hero ảnh tràn viền + bookmark nổi */}
         <View style={styles.hero}>
@@ -215,6 +222,13 @@ export default function ExperienceDetailScreen({ route, navigation }) {
             expId={id}
             userId={user.uid}
             onReviewAdded={() => getExperienceById(id).then(setExp)}
+            // cuộn thêm một đoạn khi form review vẫn bị bàn phím che
+            onNeedScroll={(delta) =>
+              scrollRef.current?.scrollTo({
+                y: scrollOffsetY.current + delta,
+                animated: true,
+              })
+            }
           />
         </View>
       </ScrollView>
@@ -257,8 +271,8 @@ const styles = StyleSheet.create({
   bottomBar: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    // modal trên iOS không có safe-area inset dưới nên phải tự đệm, không thì nút bị cắt
-    paddingBottom: spacing.md,
+    // modal trên iOS không có safe-area inset dưới nên phải tự đệm đủ qua vùng home indicator (~34px)
+    paddingBottom: Platform.select({ ios: spacing.xl + spacing.xs, android: spacing.md }),
     backgroundColor: colors.background,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
