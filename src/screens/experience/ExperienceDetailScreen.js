@@ -130,7 +130,14 @@ export default function ExperienceDetailScreen({ route, navigation }) {
 
   return (
     <View style={styles.flex}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        // đẩy nội dung lên khi mở bàn phím, không che ô nhập review (iOS)
+        automaticallyAdjustKeyboardInsets
+        // cho phép bấm nút Gửi ngay cả khi bàn phím đang mở
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Hero ảnh tràn viền + bookmark nổi */}
         <View style={styles.hero}>
           {exp.images?.[0] ? (
