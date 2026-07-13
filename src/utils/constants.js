@@ -1,19 +1,38 @@
 // src/utils/constants.js
-export const CATEGORIES = ['cafe', 'workshop', 'food', 'entertainment'];
+export const CATEGORIES = [
+  'cafe',
+  'workshop',
+  'food',
+  'entertainment',
+  'outdoor',
+  'sport',
+  'art',
+  'shopping',
+];
 
 export const CATEGORY_LABELS = {
   cafe: 'Cà phê',
   workshop: 'Lớp trải nghiệm',
   food: 'Ẩm thực',
   entertainment: 'Giải trí',
+  outdoor: 'Dã ngoại',
+  sport: 'Thể thao',
+  art: 'Nghệ thuật',
+  shopping: 'Mua sắm',
 };
 
+// Danh mục không có trong CATEGORY_LABELS (user tự nhập) thì hiển thị nguyên văn
 export const getCategoryLabel = (category) => CATEGORY_LABELS[category] ?? category;
 
 export const MOODS = [
   { key: 'relax', label: 'Thư giãn', emoji: '😌' },
   { key: 'energetic', label: 'Năng động', emoji: '⚡' },
   { key: 'social', label: 'Giao lưu', emoji: '🎉' },
+  { key: 'happy', label: 'Vui vẻ', emoji: '😄' },
+  { key: 'romantic', label: 'Lãng mạn', emoji: '💞' },
+  { key: 'adventurous', label: 'Phiêu lưu', emoji: '🧭' },
+  { key: 'nostalgic', label: 'Hoài niệm', emoji: '🍂' },
+  { key: 'peaceful', label: 'Bình yên', emoji: '🌿' },
 ];
 
 export const BUDGET_PRESETS = [

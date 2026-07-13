@@ -5,3 +5,5 @@ dist/
 *.aab
 .env
 scripts/serviceAccountKey.json
+.DS_Store
+Random_Experience_Project_Doc_Claude.md

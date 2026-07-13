@@ -245,7 +245,7 @@ export default function ExperienceDetailScreen({ route, navigation }) {
             disabled={completed}
             style={styles.checkinBtn}
           >
-            {completed ? '✅ Đã trải nghiệm' : 'Xác nhận có mặt'}
+            {completed ? '✅ Đã trải nghiệm' : 'Check in'}
           </Button>
 
           {/* [M4] Sửa/Xóa — chỉ creator thấy (firestore.rules cũng enforce) */}
@@ -275,6 +275,7 @@ export default function ExperienceDetailScreen({ route, navigation }) {
           <ReviewSection
             expId={id}
             userId={user.uid}
+            userName={user.displayName ?? user.email?.split('@')[0] ?? 'Người dùng'}
             onReviewAdded={() => getExperienceById(id).then(setExp)}
             // cuộn thêm một đoạn khi form review vẫn bị bàn phím che
             onNeedScroll={(delta) =>

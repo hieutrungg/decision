@@ -1,8 +1,9 @@
 // [M4] Form tạo / sửa experience — route param `id` có giá trị = chế độ Edit
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View, Alert } from 'react-native';
 import { Text, TextInput, Button, Chip, ActivityIndicator } from 'react-native-paper';
 import { Image } from 'expo-image';
+import MapView, { Marker } from 'react-native-maps';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import {
@@ -12,8 +13,11 @@ import {
   uploadExperienceImage,
 } from '../../services/experienceService';
 import { useAuth } from '../../hooks/useAuth';
-import { CATEGORIES, MOODS, getCategoryLabel } from '../../utils/constants';
+import { CATEGORIES, MOODS, getCategoryLabel, DEFAULT_MAP_REGION } from '../../utils/constants';
 import { colors, spacing, typography, radius } from '../../utils/theme';
+
+// giá trị chip "Khác" — không nằm trong CATEGORIES để các màn filter không bị lẫn
+const OTHER_CATEGORY = '__other__';
 
 export default function ExperienceFormScreen({ route, navigation }) {
   const expId = route.params?.id ?? null;
@@ -23,10 +27,12 @@ export default function ExperienceFormScreen({ route, navigation }) {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [searching, setSearching] = useState(false);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState(CATEGORIES[0]);
+  const [customCategory, setCustomCategory] = useState(''); // khi chọn "Khác"
   const [budget, setBudget] = useState('');
   const [duration, setDuration] = useState('');
   const [moods, setMoods] = useState([]);
@@ -34,6 +40,7 @@ export default function ExperienceFormScreen({ route, navigation }) {
   const [coords, setCoords] = useState(null); // { lat, lng }
   const [imageUri, setImageUri] = useState(null); // uri local mới chọn
   const [existingImage, setExistingImage] = useState(null); // URL đã có (edit mode)
+  const mapRef = useRef(null);
 
   useEffect(() => {
     navigation.setOptions({ title: isEdit ? 'Sửa trải nghiệm' : 'Tạo trải nghiệm' });
@@ -46,7 +53,14 @@ export default function ExperienceFormScreen({ route, navigation }) {
       }
       setTitle(exp.title ?? '');
       setDescription(exp.description ?? '');
-      setCategory(exp.category ?? CATEGORIES[0]);
+      // danh mục cũ là loại user tự nhập (không có trong danh sách) → chọn chip "Khác" và điền lại
+      const cat = exp.category ?? CATEGORIES[0];
+      if (CATEGORIES.includes(cat)) {
+        setCategory(cat);
+      } else {
+        setCategory(OTHER_CATEGORY);
+        setCustomCategory(cat);
+      }
       setBudget(String(exp.budget ?? ''));
       setDuration(String(exp.duration ?? ''));
       setMoods(exp.mood ?? []);
@@ -56,6 +70,17 @@ export default function ExperienceFormScreen({ route, navigation }) {
       setLoading(false);
     });
   }, [expId]);
+
+  // Mở form Sửa: map mount xong thì đưa camera về vị trí đã lưu
+  // (chỉ chạy khi loading đổi lúc mở form — KHÔNG phụ thuộc coords, tránh giật camera mỗi lần chỉnh ghim)
+  useEffect(() => {
+    if (!loading && coords) {
+      mapRef.current?.animateToRegion(
+        { latitude: coords.lat, longitude: coords.lng, latitudeDelta: 0.01, longitudeDelta: 0.01 },
+        0,
+      );
+    }
+  }, [loading]);
 
   const toggleMood = (key) =>
     setMoods((prev) => (prev.includes(key) ? prev.filter((m) => m !== key) : [...prev, key]));
@@ -70,6 +95,15 @@ export default function ExperienceFormScreen({ route, navigation }) {
     if (!result.canceled) setImageUri(result.assets[0].uri);
   };
 
+  // đặt ghim + trượt bản đồ tới vị trí mới
+  const moveTo = (lat, lng) => {
+    setCoords({ lat, lng });
+    mapRef.current?.animateToRegion(
+      { latitude: lat, longitude: lng, latitudeDelta: 0.01, longitudeDelta: 0.01 },
+      350,
+    );
+  };
+
   const useCurrentLocation = async () => {
     setLocating(true);
     try {
@@ -79,7 +113,7 @@ export default function ExperienceFormScreen({ route, navigation }) {
         return;
       }
       const loc = await Location.getCurrentPositionAsync({});
-      setCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+      moveTo(loc.coords.latitude, loc.coords.longitude);
     } catch (e) {
       Alert.alert('Lỗi', e.message);
     } finally {
@@ -87,16 +121,41 @@ export default function ExperienceFormScreen({ route, navigation }) {
     }
   };
 
+  // geocode địa chỉ đã gõ → ghim lên bản đồ (user kéo ghim để tinh chỉnh)
+  const searchAddressOnMap = async () => {
+    if (!address.trim()) {
+      Alert.alert('Thiếu địa chỉ', 'Nhập địa chỉ trước rồi bấm tìm trên bản đồ nhé.');
+      return;
+    }
+    setSearching(true);
+    try {
+      const results = await Location.geocodeAsync(address.trim());
+      if (results.length === 0) {
+        Alert.alert('Không tìm thấy', 'Thử nhập chi tiết hơn (kèm quận/huyện, thành phố).');
+        return;
+      }
+      moveTo(results[0].latitude, results[0].longitude);
+    } catch (e) {
+      Alert.alert('Lỗi', 'Không tìm được địa chỉ này, thử lại sau.');
+    } finally {
+      setSearching(false);
+    }
+  };
+
   const onSubmit = async () => {
     const budgetNum = Number(budget);
     const durationNum = Number(duration);
     if (!title.trim()) return Alert.alert('Thiếu thông tin', 'Nhập tên trải nghiệm nhé.');
+    if (category === OTHER_CATEGORY && !customCategory.trim())
+      return Alert.alert('Thiếu thông tin', 'Nhập tên danh mục của bạn nhé.');
     if (!budgetNum || budgetNum <= 0)
       return Alert.alert('Thiếu thông tin', 'Ngân sách phải là số lớn hơn 0 (VNĐ).');
     if (!durationNum || durationNum <= 0)
       return Alert.alert('Thiếu thông tin', 'Thời lượng phải là số phút lớn hơn 0.');
     if (moods.length === 0)
       return Alert.alert('Thiếu thông tin', 'Chọn ít nhất một tâm trạng cho trải nghiệm.');
+    if (!address.trim())
+      return Alert.alert('Thiếu thông tin', 'Nhập địa chỉ của địa điểm nhé.');
 
     setSaving(true);
     try {
@@ -106,7 +165,7 @@ export default function ExperienceFormScreen({ route, navigation }) {
       const data = {
         title: title.trim(),
         description: description.trim(),
-        category,
+        category: category === OTHER_CATEGORY ? customCategory.trim() : category,
         budget: budgetNum,
         duration: durationNum,
         mood: moods,
@@ -163,7 +222,23 @@ export default function ExperienceFormScreen({ route, navigation }) {
             {getCategoryLabel(c)}
           </Chip>
         ))}
+        <Chip
+          selected={category === OTHER_CATEGORY}
+          onPress={() => setCategory(OTHER_CATEGORY)}
+          style={styles.chip}
+        >
+          ✏️ Khác
+        </Chip>
       </View>
+      {category === OTHER_CATEGORY && (
+        <TextInput
+          label="Danh mục của bạn *"
+          value={customCategory}
+          onChangeText={setCustomCategory}
+          mode="outlined"
+          style={styles.input}
+        />
+      )}
 
       <View style={styles.row2}>
         <TextInput
@@ -199,21 +274,76 @@ export default function ExperienceFormScreen({ route, navigation }) {
       </View>
 
       <TextInput
-        label="Địa chỉ"
+        label="Địa chỉ *"
         value={address}
         onChangeText={setAddress}
         mode="outlined"
         style={styles.input}
+        right={
+          <TextInput.Icon
+            icon="map-search"
+            onPress={searchAddressOnMap}
+            forceTextInputFocus={false}
+          />
+        }
+        onSubmitEditing={searchAddressOnMap}
+        returnKeyType="search"
       />
-      <Button
-        mode="outlined"
-        icon="crosshairs-gps"
-        onPress={useCurrentLocation}
-        loading={locating}
-        style={styles.btn}
-      >
-        {coords ? `📍 Đã có tọa độ (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})` : 'Dùng vị trí hiện tại'}
-      </Button>
+      <View style={styles.locationRow}>
+        <Button
+          mode="outlined"
+          icon="map-search-outline"
+          onPress={searchAddressOnMap}
+          loading={searching}
+          style={styles.flex1}
+          compact
+        >
+          Tìm trên bản đồ
+        </Button>
+        <Button
+          mode="outlined"
+          icon="crosshairs-gps"
+          onPress={useCurrentLocation}
+          loading={locating}
+          style={styles.flex1}
+          compact
+        >
+          Vị trí hiện tại
+        </Button>
+      </View>
+
+      {/* Bản đồ chọn vị trí: chạm để đặt ghim, kéo ghim để tinh chỉnh tọa độ */}
+      <View style={styles.mapWrap}>
+        <MapView
+          ref={mapRef}
+          style={styles.map}
+          // PHẢI là object cố định — tạo object mới mỗi render sẽ gây vòng lặp
+          // "maximum update depth" của react-native-maps trên kiến trúc mới
+          initialRegion={DEFAULT_MAP_REGION}
+          onPress={(e) => {
+            const { latitude, longitude } = e.nativeEvent.coordinate;
+            setCoords({ lat: latitude, lng: longitude });
+          }}
+        >
+          {coords && (
+            <Marker
+              coordinate={{ latitude: coords.lat, longitude: coords.lng }}
+              draggable
+              onDragEnd={(e) =>
+                setCoords({
+                  lat: e.nativeEvent.coordinate.latitude,
+                  lng: e.nativeEvent.coordinate.longitude,
+                })
+              }
+            />
+          )}
+        </MapView>
+      </View>
+      <Text style={styles.mapHint}>
+        {coords
+          ? `📍 (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}) — chạm bản đồ hoặc kéo ghim để chỉnh`
+          : 'Tìm địa chỉ hoặc chạm lên bản đồ để đặt ghim vị trí'}
+      </Text>
 
       <Text style={styles.label}>Ảnh</Text>
       {previewImage && <Image source={previewImage} style={styles.preview} contentFit="cover" />}
@@ -242,6 +372,10 @@ const styles = StyleSheet.create({
   chip: { marginRight: 0 },
   row2: { flexDirection: 'row', gap: spacing.sm },
   flex1: { flex: 1 },
+  locationRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+  mapWrap: { borderRadius: radius.md, overflow: 'hidden', marginBottom: spacing.sm },
+  map: { width: '100%', height: 220 },
+  mapHint: { ...typography.caption, marginBottom: spacing.md },
   preview: { width: '100%', height: 180, borderRadius: radius.md, marginBottom: spacing.sm },
   btn: { marginBottom: spacing.md },
   submit: { marginTop: spacing.sm },
