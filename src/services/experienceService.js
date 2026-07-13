@@ -98,12 +98,15 @@ export async function getBookmarks(userId) {
  * Công thức tăng dần: newAvg = (avg × count + rating) / (count + 1)
  * (rules cho phép user thường update riêng 2 field rating/reviewCount)
  */
-export async function addReview(expId, userId, rating, comment) {
+export async function addReview(expId, userId, rating, comment, { userName = null, anonymous = false } = {}) {
   const ref = await addDoc(collection(db, COLLECTIONS.REVIEWS), {
     expId,
     userId,
     rating,
     comment,
+    // ẩn danh thì không lưu tên — list sẽ hiện "Ẩn danh"
+    userName: anonymous ? null : userName,
+    anonymous,
     createdAt: serverTimestamp(),
   });
 

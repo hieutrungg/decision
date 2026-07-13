@@ -1,33 +1,53 @@
 // [M4] Danh sách review + form viết review — dùng trong ExperienceDetailScreen
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Alert, Keyboard } from 'react-native';
-import { Text, TextInput, Button, IconButton, ActivityIndicator, Divider } from 'react-native-paper';
+import { Text, TextInput, Button, IconButton, ActivityIndicator, Divider, Switch } from 'react-native-paper';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { addReview, getReviews } from '../../services/experienceService';
 import { colors, spacing, typography, radius } from '../../utils/theme';
 
+const STAR_COLOR = '#FBBF24'; // vàng — không dùng IconButton disabled vì nó ép về màu xám
+
 function Stars({ value, size = 18, onChange }) {
+  // Sao chỉ để hiển thị (trong list đánh giá) — icon thường, luôn giữ màu vàng
+  if (!onChange) {
+    return (
+      <View style={styles.starRow}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <MaterialCommunityIcons
+            key={i}
+            name={i <= value ? 'star' : 'star-outline'}
+            size={size}
+            color={i <= value ? STAR_COLOR : colors.textMuted}
+            style={styles.starIcon}
+          />
+        ))}
+      </View>
+    );
+  }
+  // Sao bấm được (trong form chấm điểm)
   return (
     <View style={styles.starRow}>
       {[1, 2, 3, 4, 5].map((i) => (
         <IconButton
           key={i}
           icon={i <= value ? 'star' : 'star-outline'}
-          iconColor={colors.primary}
+          iconColor={i <= value ? STAR_COLOR : colors.textMuted}
           size={size}
           style={styles.starBtn}
-          disabled={!onChange}
-          onPress={onChange ? () => onChange(i) : undefined}
+          onPress={() => onChange(i)}
         />
       ))}
     </View>
   );
 }
 
-export default function ReviewSection({ expId, userId, onReviewAdded, onNeedScroll }) {
+export default function ReviewSection({ expId, userId, userName, onReviewAdded, onNeedScroll }) {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
+  const [anonymous, setAnonymous] = useState(false); // mặc định hiện tên người dùng
   const [sending, setSending] = useState(false);
   const formRef = useRef(null);
   const inputFocused = useRef(false);
@@ -64,9 +84,10 @@ export default function ReviewSection({ expId, userId, onReviewAdded, onNeedScro
     if (rating < 1) return Alert.alert('Thiếu đánh giá', 'Chọn số sao trước đã nhé (1–5).');
     setSending(true);
     try {
-      await addReview(expId, userId, rating, comment.trim());
+      await addReview(expId, userId, rating, comment.trim(), { userName, anonymous });
       setRating(0);
       setComment('');
+      setAnonymous(false);
       await load();
       onReviewAdded?.();
     } catch (e) {
@@ -96,6 +117,15 @@ export default function ReviewSection({ expId, userId, onReviewAdded, onNeedScro
             onFocus={() => (inputFocused.current = true)}
             onBlur={() => (inputFocused.current = false)}
           />
+          <View style={styles.anonRow}>
+            <View style={styles.anonLabelWrap}>
+              <Text style={styles.anonLabel}>Đánh giá ẩn danh</Text>
+              <Text style={styles.anonHint}>
+                {anonymous ? 'Sẽ hiện là "Ẩn danh"' : `Sẽ hiện tên: ${userName || 'Người dùng'}`}
+              </Text>
+            </View>
+            <Switch value={anonymous} onValueChange={setAnonymous} color={colors.primary} />
+          </View>
           <Button mode="contained" onPress={onSubmit} loading={sending} disabled={sending}>
             Gửi đánh giá
           </Button>
@@ -112,11 +142,14 @@ export default function ReviewSection({ expId, userId, onReviewAdded, onNeedScro
             {idx > 0 && <Divider style={styles.divider} />}
             <View style={styles.item}>
               <View style={styles.itemHeader}>
-                <Stars value={r.rating} size={14} />
+                <Text style={styles.reviewer}>
+                  {r.anonymous ? '🕶️ Ẩn danh' : r.userName || 'Người dùng'}
+                </Text>
                 <Text style={styles.date}>
                   {r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString('vi-VN') : ''}
                 </Text>
               </View>
+              <Stars value={r.rating} size={14} />
               {!!r.comment && <Text style={styles.comment}>{r.comment}</Text>}
             </View>
           </View>
@@ -137,12 +170,23 @@ const styles = StyleSheet.create({
   },
   input: { marginVertical: spacing.sm, backgroundColor: colors.background },
   reviewed: { ...typography.body, color: colors.success, marginBottom: spacing.md },
-  starRow: { flexDirection: 'row' },
+  starRow: { flexDirection: 'row', alignItems: 'center' },
   starBtn: { margin: 0, width: 30 },
+  starIcon: { marginRight: 2 },
   empty: { ...typography.caption, marginTop: spacing.sm },
   item: { paddingVertical: spacing.sm },
   itemHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  reviewer: { ...typography.body, fontWeight: '600' },
   date: { ...typography.caption },
+  anonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  anonLabelWrap: { flex: 1, marginRight: spacing.sm },
+  anonLabel: { ...typography.body },
+  anonHint: { ...typography.caption },
   comment: { ...typography.body, marginTop: spacing.xs },
   divider: { backgroundColor: colors.border },
 });
