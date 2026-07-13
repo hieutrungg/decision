@@ -94,9 +94,9 @@ export default function MapScreen({ navigation, route }) {
     () =>
       Array.isArray(itineraryItems)
         ? itineraryItems
-            .filter(hasValidLocation)
-            .map((item) => `${item.id}:${item.location.lat},${item.location.lng}`)
-            .join('|')
+          .filter(hasValidLocation)
+          .map((item) => `${item.id}:${item.location.lat},${item.location.lng}`)
+          .join('|')
         : '',
     [itineraryItems],
   );
@@ -243,8 +243,8 @@ export default function MapScreen({ navigation, route }) {
 
     const points = Array.isArray(itineraryItems)
       ? itineraryItems
-          .filter(hasValidLocation)
-          .map((item) => ({ lat: item.location.lat, lng: item.location.lng }))
+        .filter(hasValidLocation)
+        .map((item) => ({ lat: item.location.lat, lng: item.location.lng }))
       : [];
 
     console.log('[MapScreen] points:', points);
@@ -446,7 +446,6 @@ export default function MapScreen({ navigation, route }) {
               coordinates={routeCoordinates}
               strokeWidth={8}
               strokeColor="#0000FF"
-              geodesic
               zIndex={999}
             />
           ) : null}

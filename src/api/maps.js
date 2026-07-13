@@ -1,12 +1,14 @@
 import Constants from 'expo-constants';
 
-const API_KEY = Constants.expoConfig?.extra?.googleMapsApiKey;
+const GOOGLE_API_KEY = Constants.expoConfig?.extra?.googleMapsApiKey;
 const BASE = 'https://maps.googleapis.com/maps/api';
+const OSRM_BASE = 'https://router.project-osrm.org/route/v1/driving';
 
-export async function getRoute(points) {
-  if (!points || points.length < 2) throw new Error('Need at least 2 points');
-  if (!API_KEY) throw new Error('Missing Google Maps API key');
+function hasRealGoogleApiKey() {
+  return !!GOOGLE_API_KEY && !GOOGLE_API_KEY.startsWith('YOUR_');
+}
 
+async function fetchGoogleRoute(points) {
   const origin = `${points[0].lat},${points[0].lng}`;
   const destination = `${points[points.length - 1].lat},${points[points.length - 1].lng}`;
   const waypoints = points
@@ -17,7 +19,7 @@ export async function getRoute(points) {
   const url =
     `${BASE}/directions/json?origin=${origin}&destination=${destination}` +
     (waypoints ? `&waypoints=${waypoints}` : '') +
-    `&mode=driving&key=${API_KEY}`;
+    `&mode=driving&key=${GOOGLE_API_KEY}`;
 
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Directions request failed with status ${res.status}`);
@@ -28,6 +30,42 @@ export async function getRoute(points) {
   }
 
   return data;
+}
+
+async function fetchOsrmRoute(points) {
+  const coordinates = points.map((point) => `${point.lng},${point.lat}`).join(';');
+  const url = `${OSRM_BASE}/${coordinates}?overview=full&geometries=polyline&steps=false&alternatives=false`;
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`OSRM request failed with status ${res.status}`);
+
+  const data = await res.json();
+  if (data.code !== 'Ok' || !data.routes?.length || !data.routes[0]?.geometry) {
+    throw new Error('OSRM returned no route');
+  }
+
+  return {
+    routes: [
+      {
+        overview_polyline: {
+          points: data.routes[0].geometry,
+        },
+      },
+    ],
+  };
+}
+
+export async function getRoute(points) {
+  if (!points || points.length < 2) throw new Error('Need at least 2 points');
+  if (hasRealGoogleApiKey()) {
+    try {
+      return await fetchGoogleRoute(points);
+    } catch (error) {
+      console.warn('[maps] Google Directions failed, fallback to OSRM:', error?.message || error);
+    }
+  }
+
+  return fetchOsrmRoute(points);
 }
 
 export function haversineKm(a, b) {
