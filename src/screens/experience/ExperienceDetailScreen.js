@@ -1,6 +1,15 @@
-// [M4] Chi tiết experience: ảnh, mô tả, rating, bookmark, chỉ đường, check-in
+// [M4] Chi tiết experience: ảnh, mô tả, rating, bookmark, chỉ đường, check-in, chia sẻ
 import React, { useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View, Alert, Linking, Platform, Keyboard } from 'react-native';
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  Alert,
+  Linking,
+  Platform,
+  Keyboard,
+  Share,
+} from 'react-native';
 import { Text, Button, ActivityIndicator, Chip, IconButton } from 'react-native-paper';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -63,7 +72,7 @@ export default function ExperienceDetailScreen({ route, navigation }) {
     setBookmarked(nowBookmarked);
   };
 
-  // ← MỚI: mở Google Maps chỉ đường tới địa điểm
+  // mở Google Maps chỉ đường tới địa điểm
   const openDirections = async () => {
     const { lat, lng } = exp.location ?? {};
     if (!lat || !lng) {
@@ -76,6 +85,21 @@ export default function ExperienceDetailScreen({ route, navigation }) {
       Linking.openURL(url);
     } else {
       Alert.alert('Lỗi', 'Không mở được Google Maps trên thiết bị này.');
+    }
+  };
+
+  // ← MỚI: share trải nghiệm ra ngoài app (Zalo, Messenger, SMS...)
+  const onShare = async () => {
+    try {
+      const message = completed
+        ? `Tôi vừa trải nghiệm ${exp.title} tại Random Experience! 🎉\n📍 ${exp.location?.address ?? ''}`
+        : `Mình đang định thử ${exp.title} trên Random Experience, cùng đi không? 👀\n📍 ${exp.location?.address ?? ''}`;
+      await Share.share({
+        message,
+        title: exp.title, // chỉ có tác dụng trên Android
+      });
+    } catch (e) {
+      Alert.alert('Lỗi', 'Không chia sẻ được lúc này.');
     }
   };
 
@@ -156,7 +180,7 @@ export default function ExperienceDetailScreen({ route, navigation }) {
         }}
         scrollEventThrottle={16}
       >
-        {/* Hero ảnh tràn viền + bookmark nổi */}
+        {/* Hero ảnh tràn viền + bookmark/share nổi */}
         <View style={styles.hero}>
           {exp.images?.[0] ? (
             <Image source={exp.images[0]} style={styles.image} contentFit="cover" />
@@ -166,6 +190,16 @@ export default function ExperienceDetailScreen({ route, navigation }) {
             </View>
           )}
           <SafeAreaView style={styles.heroActions} edges={['top']}>
+            {/* ← MỚI: nút chia sẻ, đặt cạnh bookmark */}
+            <IconButton
+              icon="share-variant"
+              mode="contained"
+              iconColor={colors.text}
+              containerColor={colors.background}
+              size={24}
+              onPress={onShare}
+              style={styles.shareBtn}
+            />
             <IconButton
               icon={bookmarked ? 'bookmark' : 'bookmark-outline'}
               mode="contained"
@@ -182,10 +216,18 @@ export default function ExperienceDetailScreen({ route, navigation }) {
           <Text style={styles.title}>{exp.title}</Text>
 
           <View style={styles.row}>
-            <Chip icon="tag" compact style={styles.chip}>{exp.category}</Chip>
-            <Chip icon="cash" compact style={styles.chip}>{(exp.budget / 1000).toFixed(0)}k</Chip>
-            <Chip icon="clock-outline" compact style={styles.chip}>{exp.duration} phút</Chip>
-            <Chip icon="star" compact style={styles.chip}>{exp.rating?.toFixed(1) ?? '—'}</Chip>
+            <Chip icon="tag" compact style={styles.chip}>
+              {exp.category}
+            </Chip>
+            <Chip icon="cash" compact style={styles.chip}>
+              {(exp.budget / 1000).toFixed(0)}k
+            </Chip>
+            <Chip icon="clock-outline" compact style={styles.chip}>
+              {exp.duration} phút
+            </Chip>
+            <Chip icon="star" compact style={styles.chip}>
+              {exp.rating?.toFixed(1) ?? '—'}
+            </Chip>
           </View>
 
           <Text style={styles.desc}>{exp.description}</Text>
@@ -265,9 +307,21 @@ const styles = StyleSheet.create({
   container: { paddingBottom: spacing.xl * 2 },
   hero: { position: 'relative' },
   image: { width: '100%', height: 260 },
-  imageFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  imageFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
   fallbackEmoji: { fontSize: 56 },
-  heroActions: { position: 'absolute', top: 0, right: 0, padding: spacing.sm },
+  heroActions: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    padding: spacing.sm,
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  shareBtn: { ...shadow.sm },
   bookmarkBtn: { ...shadow.sm },
   body: { padding: spacing.lg },
   title: { ...typography.title, marginBottom: spacing.md },
