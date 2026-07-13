@@ -29,14 +29,17 @@ export default function FindFriendsScreen() {
       try {
         const [users, myFollowing] = await Promise.all([searchUsers(kw), getFollowing(user.uid)]);
         setFollowingIds(new Set(myFollowing));
-        setResults(users.filter((u) => u.uid !== user.uid)); // bỏ chính mình khỏi kết quả
+        setResults(users.filter((u) => u.uid !== user.uid));
+        r;
+      } catch (e) {
+        console.error('searchUsers error:', e); // ← xem log này trong Metro/console
+        Alert.alert('Lỗi tìm kiếm', e.message);
       } finally {
         setLoading(false);
       }
     },
     [user.uid],
   );
-
   const onChangeKeyword = (text) => {
     setKeyword(text);
     if (debounceRef.current) clearTimeout(debounceRef.current);
