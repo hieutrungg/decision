@@ -30,7 +30,6 @@ export default function FindFriendsScreen() {
         const [users, myFollowing] = await Promise.all([searchUsers(kw), getFollowing(user.uid)]);
         setFollowingIds(new Set(myFollowing));
         setResults(users.filter((u) => u.uid !== user.uid));
-        r;
       } catch (e) {
         console.error('searchUsers error:', e); // ← xem log này trong Metro/console
         Alert.alert('Lỗi tìm kiếm', e.message);
