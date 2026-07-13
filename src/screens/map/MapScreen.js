@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import polyline from '@mapbox/polyline';
 import * as Location from 'expo-location';
@@ -11,15 +11,15 @@ import { DEFAULT_MAP_REGION } from '../../utils/constants';
 import { colors, spacing, typography } from '../../utils/theme';
 
 const CATEGORY_FILTERS = [
-  { key: 'all', label: 'Tat ca' },
-  { key: 'cafe', label: 'cafe' },
-  { key: 'workshop', label: 'workshop' },
-  { key: 'food', label: 'food' },
-  { key: 'entertainment', label: 'entertainment' },
+  { key: 'all', label: 'Tất cả' },
+  { key: 'cafe', label: 'Cà phê' },
+  { key: 'workshop', label: 'Workshop' },
+  { key: 'food', label: 'Ăn uống' },
+  { key: 'entertainment', label: 'Giải trí' },
 ];
 
 const DISTANCE_FILTERS = [
-  { key: 'all', label: 'Tat ca', value: null },
+  { key: 'all', label: 'Tất cả', value: null },
   { key: '1', label: '1 km', value: 1 },
   { key: '3', label: '3 km', value: 3 },
   { key: '5', label: '5 km', value: 5 },
@@ -69,6 +69,34 @@ function getFallbackPolyline(points) {
   }));
 }
 
+function getRouteSummary(routeData, points) {
+  const legs = routeData?.routes?.[0]?.legs ?? [];
+  const distanceMeters = legs.reduce((sum, leg) => sum + (leg?.distance?.value ?? 0), 0);
+  const durationSeconds = legs.reduce((sum, leg) => sum + (leg?.duration?.value ?? 0), 0);
+
+  if (distanceMeters > 0 || durationSeconds > 0) {
+    return {
+      distanceKm: distanceMeters / 1000,
+      durationMin: durationSeconds / 60,
+      legs: legs.length,
+    };
+  }
+
+  if (points.length >= 2) {
+    const distanceKm = points.slice(1).reduce((sum, point, index) => {
+      return sum + haversineKm(points[index], point);
+    }, 0);
+
+    return {
+      distanceKm,
+      durationMin: 0,
+      legs: Math.max(points.length - 1, 0),
+    };
+  }
+
+  return { distanceKm: 0, durationMin: 0, legs: 0 };
+}
+
 export default function MapScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const mapRef = useRef(null);
@@ -76,6 +104,8 @@ export default function MapScreen({ navigation, route }) {
   const [markers, setMarkers] = useState([]);
   const [userCoords, setUserCoords] = useState(null);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
+  const [routeSummary, setRouteSummary] = useState({ distanceKm: 0, durationMin: 0, legs: 0 });
+  const [selectedRouteIds, setSelectedRouteIds] = useState([]);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState('');
   const [permissionDenied, setPermissionDenied] = useState(false);
@@ -90,27 +120,24 @@ export default function MapScreen({ navigation, route }) {
   const routeMode = route?.params?.viewMode ?? 'all';
   const itineraryKey = route?.params?.itineraryKey ?? 0;
   const refreshKey = route?.params?.refreshKey ?? 0;
-  const itineraryRouteKey = useMemo(
-    () =>
-      Array.isArray(itineraryItems)
-        ? itineraryItems
-          .filter(hasValidLocation)
-          .map((item) => `${item.id}:${item.location.lat},${item.location.lng}`)
-          .join('|')
-        : '',
-    [itineraryItems],
-  );
   const isItineraryMode = useMemo(() => mapMode === 'itinerary', [mapMode]);
+  const selectedRoutePoints = useMemo(
+    () =>
+      selectedRouteIds
+        .map((id) => markers.find((item) => item.id === id))
+        .filter(Boolean),
+    [markers, selectedRouteIds],
+  );
   const selectedDistanceValue = useMemo(
     () => DISTANCE_FILTERS.find((item) => item.key === selectedDistance)?.value ?? null,
     [selectedDistance],
   );
   const selectedCategoryLabel = useMemo(
-    () => CATEGORY_FILTERS.find((item) => item.key === selectedCategory)?.label ?? 'Tat ca',
+    () => CATEGORY_FILTERS.find((item) => item.key === selectedCategory)?.label ?? 'Tất cả',
     [selectedCategory],
   );
   const selectedDistanceLabel = useMemo(
-    () => DISTANCE_FILTERS.find((item) => item.key === selectedDistance)?.label ?? 'Tat ca',
+    () => DISTANCE_FILTERS.find((item) => item.key === selectedDistance)?.label ?? 'Tất cả',
     [selectedDistance],
   );
   const activeFilterOptions = useMemo(
@@ -179,6 +206,7 @@ export default function MapScreen({ navigation, route }) {
     setRouteCoordinates([]);
     setRouteError('');
     setRouteLoading(false);
+    setSelectedRouteIds([]);
     setSelectedCategory('all');
     setSelectedDistance('all');
 
@@ -193,7 +221,7 @@ export default function MapScreen({ navigation, route }) {
       setRegion(baseRegion);
     } catch (e) {
       setMarkers([]);
-      setError(e?.message || 'Khong tai duoc du lieu dia diem luc nay.');
+      setError(e?.message || 'Không tải được dữ liệu địa điểm lúc này.');
     } finally {
       setLoading(false);
     }
@@ -205,6 +233,7 @@ export default function MapScreen({ navigation, route }) {
       setError('');
       setMapMode('itinerary');
       setRouteError('');
+      setSelectedRouteIds([]);
       setSelectedCategory('all');
       setSelectedDistance('all');
 
@@ -216,7 +245,7 @@ export default function MapScreen({ navigation, route }) {
         setRouteCoordinates([]);
       } catch (e) {
         setMarkers([]);
-        setError(e?.message || 'Khong mo duoc lich trinh tren ban do.');
+        setError(e?.message || 'Không mở được lịch trình trên bản đồ.');
       } finally {
         setLoading(false);
       }
@@ -238,19 +267,13 @@ export default function MapScreen({ navigation, route }) {
       setRouteCoordinates([]);
       setRouteError('');
       setRouteLoading(false);
+      setSelectedRouteIds([]);
       return;
     }
 
-    const points = Array.isArray(itineraryItems)
-      ? itineraryItems
-        .filter(hasValidLocation)
-        .map((item) => ({ lat: item.location.lat, lng: item.location.lng }))
-      : [];
-
-    console.log('[MapScreen] points:', points);
-
-    if (points.length < 2) {
+    if (selectedRoutePoints.length !== 2) {
       setRouteCoordinates([]);
+      setRouteSummary({ distanceKm: 0, durationMin: 0, legs: 0 });
       setRouteError('');
       setRouteLoading(false);
       return;
@@ -263,6 +286,7 @@ export default function MapScreen({ navigation, route }) {
       setRouteError('');
 
       try {
+        const points = selectedRoutePoints.map((item) => ({ lat: item.location.lat, lng: item.location.lng }));
         const routeData = await getRoute(points);
         const encoded = routeData.routes?.[0]?.overview_polyline?.points;
         if (!encoded) {
@@ -276,12 +300,15 @@ export default function MapScreen({ navigation, route }) {
 
         if (active) {
           setRouteCoordinates(decoded);
+          setRouteSummary(getRouteSummary(routeData, points));
         }
       } catch {
         if (active) {
+          const points = selectedRoutePoints.map((item) => ({ lat: item.location.lat, lng: item.location.lng }));
           const fallbackCoordinates = getFallbackPolyline(points);
           setRouteCoordinates(fallbackCoordinates);
-          setRouteError('Dang hien thi duong noi tam thoi.');
+          setRouteSummary(getRouteSummary(null, points));
+          setRouteError('Đang hiển thị đường đi tạm thời.');
         }
       } finally {
         if (active) {
@@ -295,11 +322,7 @@ export default function MapScreen({ navigation, route }) {
     return () => {
       active = false;
     };
-  }, [itineraryItems, itineraryRouteKey, routeMode]);
-
-  useEffect(() => {
-    console.log('[MapScreen] routeCoordinates:', routeCoordinates);
-  }, [routeCoordinates]);
+  }, [routeMode, selectedRoutePoints]);
 
   useEffect(() => {
     if (!mapRef.current || routeCoordinates.length < 2) return;
@@ -362,11 +385,42 @@ export default function MapScreen({ navigation, route }) {
     closeFilterModal();
   };
 
+  const handleMarkerPress = (experience) => {
+    if (!isItineraryMode) {
+      navigation.navigate('ExperienceDetail', { id: experience.id });
+      return;
+    }
+
+    setRouteError('');
+    setSelectedRouteIds((current) => {
+      if (current.length === 0) {
+        return [experience.id];
+      }
+
+      if (current.length === 1) {
+        if (current[0] === experience.id) {
+          return [];
+        }
+
+        return [current[0], experience.id];
+      }
+
+      return [experience.id];
+    });
+  };
+
+  const clearRouteSelection = () => {
+    setSelectedRouteIds([]);
+    setRouteCoordinates([]);
+    setRouteSummary({ distanceKm: 0, durationMin: 0, legs: 0 });
+    setRouteError('');
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.centered} edges={['top']}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.message}>Dang tai ban do va dia diem...</Text>
+        <Text style={styles.message}>Đang tải bản đồ và địa điểm...</Text>
       </SafeAreaView>
     );
   }
@@ -374,10 +428,10 @@ export default function MapScreen({ navigation, route }) {
   if (error) {
     return (
       <SafeAreaView style={styles.centered} edges={['top']}>
-        <Text style={styles.stateTitle}>Chua tai duoc ban do</Text>
-        <Text style={styles.message}>Da xay ra loi khi lay du lieu dia diem. Vui long thu lai.</Text>
+        <Text style={styles.stateTitle}>Chưa tải được bản đồ</Text>
+        <Text style={styles.message}>Đã xảy ra lỗi khi lấy dữ liệu địa điểm. Vui lòng thử lại.</Text>
         <Button mode="contained" onPress={isItineraryMode ? () => loadItinerary(itineraryItems) : loadAllExperiences}>
-          Tai lai
+          Tải lại
         </Button>
       </SafeAreaView>
     );
@@ -387,15 +441,15 @@ export default function MapScreen({ navigation, route }) {
     return (
       <SafeAreaView style={styles.centered} edges={['top']}>
         <Text style={styles.stateTitle}>
-          {isItineraryMode ? 'Lich trinh goi y chua co toa do hop le' : 'Chua co dia diem de hien thi'}
+          {isItineraryMode ? 'Lịch trình gợi ý chưa có tọa độ hợp lệ' : 'Chưa có địa điểm để hiển thị'}
         </Text>
         <Text style={styles.message}>
           {isItineraryMode
-            ? 'Cac item trong lich trinh nay chua co location hop le de dat marker.'
-            : 'Hien chua co experience nao co location hop le. Hay seed du lieu roi mo lai man hinh nay.'}
+            ? 'Các item trong lịch trình này chưa có location hợp lệ để đặt marker.'
+            : 'Hiện chưa có địa điểm nào có tọa độ hợp lệ. Hãy nạp dữ liệu rồi mở lại màn hình này.'}
         </Text>
         <Button mode="outlined" onPress={isItineraryMode ? openAllMap : loadAllExperiences}>
-          {isItineraryMode ? 'Xem ban do chung' : 'Tai lai'}
+          {isItineraryMode ? 'Xem bản đồ chung' : 'Tải lại'}
         </Button>
       </SafeAreaView>
     );
@@ -403,27 +457,21 @@ export default function MapScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      {isItineraryMode ? (
-        <View style={styles.banner}>
-          <Text style={styles.bannerText}>Dang xem Lich trinh goi y</Text>
-        </View>
-      ) : null}
-
       {permissionDenied ? (
         <View style={styles.banner}>
-          <Text style={styles.bannerText}>Khong co quyen vi tri, dang hien thi khu vuc Ha Noi mac dinh.</Text>
+          <Text style={styles.bannerText}>Không có quyền vị trí, đang hiển thị khu vực Hà Nội mặc định.</Text>
         </View>
       ) : null}
 
       {shouldWarnDistanceFilter ? (
         <View style={styles.banner}>
-          <Text style={styles.bannerText}>Can quyen vi tri de loc theo khoang cach.</Text>
+          <Text style={styles.bannerText}>Cần quyền vị trí để lọc theo khoảng cách.</Text>
         </View>
       ) : null}
 
       {isItineraryMode && routeLoading ? (
         <View style={styles.banner}>
-          <Text style={styles.bannerText}>Dang tai duong di goi y...</Text>
+          <Text style={styles.bannerText}>Đang tải đường đi gợi ý...</Text>
         </View>
       ) : null}
 
@@ -435,7 +483,7 @@ export default function MapScreen({ navigation, route }) {
 
       {!isItineraryMode && markers.length > 0 && displayedMarkers.length === 0 ? (
         <View style={styles.banner}>
-          <Text style={styles.bannerText}>Khong co dia diem nao phu hop voi bo loc hien tai.</Text>
+          <Text style={styles.bannerText}>Không có địa điểm nào phù hợp với bộ lọc hiện tại.</Text>
         </View>
       ) : null}
 
@@ -459,26 +507,83 @@ export default function MapScreen({ navigation, route }) {
               }}
               title={experience.title}
               description={experience.location.address}
-              onPress={() => navigation.navigate('ExperienceDetail', { id: experience.id })}
+              pinColor={
+                selectedRouteIds[0] === experience.id
+                  ? colors.primary
+                  : selectedRouteIds[1] === experience.id
+                    ? colors.secondary
+                    : undefined
+              }
+              onPress={() => handleMarkerPress(experience)}
             />
           ))}
         </MapView>
+
+        {isItineraryMode ? (
+          <View style={[styles.routePicker, { bottom: insets.bottom + 72 }]}>
+            <View style={styles.routePickerHeader}>
+              <View style={styles.routePickerHeaderText}>
+                <Text style={styles.routePickerTitle}>Chọn 2 điểm để xem đường đi</Text>
+                <Text style={styles.routePickerHint}>
+                  {selectedRoutePoints.length === 0
+                    ? 'Chạm vào một địa điểm để chọn điểm đầu.'
+                    : selectedRoutePoints.length === 1
+                      ? `Đã chọn ${selectedRoutePoints[0]?.title}. Chọn điểm thứ hai.`
+                      : `Đang xem ${selectedRoutePoints[0]?.title} → ${selectedRoutePoints[1]?.title}.`}
+                </Text>
+              </View>
+              <Button mode="text" compact onPress={clearRouteSelection}>
+                Xóa chọn
+              </Button>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.routeChipRow}>
+              {displayedMarkers.map((experience) => {
+                const isFirst = selectedRouteIds[0] === experience.id;
+                const isSecond = selectedRouteIds[1] === experience.id;
+                return (
+                  <Pressable
+                    key={experience.id}
+                    style={[
+                      styles.routeChip,
+                      isFirst && styles.routeChipFirst,
+                      isSecond && styles.routeChipSecond,
+                    ]}
+                    onPress={() => handleMarkerPress(experience)}
+                  >
+                    <Text style={styles.routeChipText}>
+                      {isFirst ? 'A: ' : isSecond ? 'B: ' : ''}
+                      {experience.title}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            {routeCoordinates.length >= 2 ? (
+              <View style={styles.routeResult}>
+                <Text style={styles.routeResultText}>
+                  Khoảng cách: ~{routeSummary.distanceKm.toFixed(1)} km
+                  {routeSummary.durationMin > 0 ? ` · ~${Math.round(routeSummary.durationMin)} phút` : ''}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
         {!isItineraryMode ? (
           <View style={[styles.filterOverlay, { top: insets.top + spacing.sm }]}>
             <View style={styles.filterBox}>
               <Pressable style={styles.selectField} onPress={() => setActiveFilter('category')}>
-                <Text style={styles.selectLabel}>Loai dia diem</Text>
+                <Text style={styles.selectLabel}>Loại địa điểm</Text>
                 <Text style={styles.selectValue}>{selectedCategoryLabel}</Text>
               </Pressable>
 
               <Pressable style={styles.selectField} onPress={() => setActiveFilter('distance')}>
-                <Text style={styles.selectLabel}>Khoang cach</Text>
+                <Text style={styles.selectLabel}>Khoảng cách</Text>
                 <Text style={styles.selectValue}>{selectedDistanceLabel}</Text>
               </Pressable>
 
               <Button mode="text" compact onPress={resetFilters} style={styles.resetButton}>
-                Dat lai
+                Đặt lại
               </Button>
             </View>
           </View>
@@ -489,7 +594,7 @@ export default function MapScreen({ navigation, route }) {
         <Pressable style={styles.modalBackdrop} onPress={closeFilterModal} />
         <View style={styles.modalSheet}>
           <Text style={styles.modalTitle}>
-            {activeFilter === 'category' ? 'Chon loai dia diem' : 'Chon khoang cach'}
+            {activeFilter === 'category' ? 'Chọn loại địa điểm' : 'Chọn khoảng cách'}
           </Text>
           {activeFilterOptions.map((item) => (
             <Pressable
@@ -539,6 +644,78 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
     textAlign: 'center',
+  },
+  routePicker: {
+    position: 'absolute',
+    left: spacing.md,
+    right: spacing.md,
+    bottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.98)',
+    borderRadius: 16,
+    padding: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 10,
+  },
+  routePickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  routePickerHeaderText: {
+    flex: 1,
+    gap: 2,
+  },
+  routePickerTitle: {
+    ...typography.body,
+    color: colors.text,
+    fontWeight: '600',
+    flex: 1,
+  },
+  routePickerHint: {
+    ...typography.caption,
+    color: colors.textMuted,
+  },
+  routeChipRow: {
+    gap: spacing.sm,
+    paddingRight: spacing.sm,
+  },
+  routeChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+  },
+  routeChipFirst: {
+    borderColor: colors.primary,
+    backgroundColor: '#FFF1EA',
+  },
+  routeChipSecond: {
+    borderColor: colors.secondary,
+    backgroundColor: '#E8FBF8',
+  },
+  routeChipText: {
+    ...typography.caption,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  routeResult: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  routeResultText: {
+    ...typography.caption,
+    color: colors.text,
+    textAlign: 'center',
+    fontWeight: '600',
   },
   filterOverlay: {
     position: 'absolute',

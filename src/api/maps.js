@@ -29,7 +29,15 @@ async function fetchGoogleRoute(points) {
     throw new Error('Directions API returned no route');
   }
 
-  return data;
+  const route = data.routes[0];
+  return {
+    routes: [
+      {
+        overview_polyline: route.overview_polyline,
+        legs: route.legs ?? [],
+      },
+    ],
+  };
 }
 
 async function fetchOsrmRoute(points) {
@@ -50,6 +58,7 @@ async function fetchOsrmRoute(points) {
         overview_polyline: {
           points: data.routes[0].geometry,
         },
+        legs: data.routes[0].legs ?? [],
       },
     ],
   };
@@ -60,8 +69,7 @@ export async function getRoute(points) {
   if (hasRealGoogleApiKey()) {
     try {
       return await fetchGoogleRoute(points);
-    } catch (error) {
-      console.warn('[maps] Google Directions failed, fallback to OSRM:', error?.message || error);
+    } catch {
     }
   }
 
