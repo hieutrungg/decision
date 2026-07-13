@@ -1,11 +1,17 @@
 // [M4] Chi tiết experience: ảnh, mô tả, rating, bookmark, chỉ đường, check-in
-import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View, Alert, Linking } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ScrollView, StyleSheet, View, Alert, Linking, Platform, Keyboard } from 'react-native';
 import { Text, Button, ActivityIndicator, Chip, IconButton } from 'react-native-paper';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import { getExperienceById, toggleBookmark, getBookmarks } from '../../services/experienceService';
+import {
+  getExperienceById,
+  toggleBookmark,
+  getBookmarks,
+  deleteExperience,
+} from '../../services/experienceService';
+import ReviewSection from '../../components/experience/ReviewSection';
 import {
   markCompleted,
   updateStreak,
@@ -19,19 +25,35 @@ import { spacing, typography, radius, colors, shadow } from '../../utils/theme';
 
 const CHECKIN_RADIUS_KM = 0.5; // 500m
 
-export default function ExperienceDetailScreen({ route }) {
+export default function ExperienceDetailScreen({ route, navigation }) {
   const { id } = route.params;
   const { user } = useAuth();
   const [exp, setExp] = useState(null);
   const [bookmarked, setBookmarked] = useState(false);
   const [checkingIn, setCheckingIn] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const scrollRef = useRef(null);
+  const scrollOffsetY = useRef(0);
+  // đệm thêm dưới đáy khi mở bàn phím để có chỗ cuộn cả nút Gửi lên (modal tính inset bị hụt)
+  const [kbPad, setKbPad] = useState(0);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKbPad(spacing.xl * 4));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbPad(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   useEffect(() => {
     getExperienceById(id).then(setExp);
     // Restore persisted bookmark + check-in state
     getBookmarks(user.uid).then((ids) => setBookmarked(ids.includes(id)));
     getCompleted(user.uid).then((list) => setCompleted(list.some((c) => c.expId === id)));
+    // Reload khi quay lại từ màn Sửa để thấy thay đổi ngay
+    const unsub = navigation.addListener('focus', () => getExperienceById(id).then(setExp));
+    return unsub;
   }, [id, user.uid]);
 
   if (!exp) return <ActivityIndicator style={{ flex: 1 }} />;
@@ -101,9 +123,39 @@ export default function ExperienceDetailScreen({ route }) {
     }
   };
 
+  const onDelete = () => {
+    Alert.alert('Xóa experience?', 'Hành động này không thể hoàn tác.', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Xóa',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteExperience(id);
+            navigation.goBack();
+          } catch (e) {
+            Alert.alert('Lỗi', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <View style={styles.flex}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={[styles.container, kbPad > 0 && { paddingBottom: kbPad }]}
+        showsVerticalScrollIndicator={false}
+        // đẩy nội dung lên khi mở bàn phím, không che ô nhập review (iOS)
+        automaticallyAdjustKeyboardInsets
+        // cho phép bấm nút Gửi ngay cả khi bàn phím đang mở
+        keyboardShouldPersistTaps="handled"
+        onScroll={(e) => {
+          scrollOffsetY.current = e.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={16}
+      >
         {/* Hero ảnh tràn viền + bookmark nổi */}
         <View style={styles.hero}>
           {exp.images?.[0] ? (
@@ -153,7 +205,42 @@ export default function ExperienceDetailScreen({ route }) {
             {completed ? '✅ Đã trải nghiệm' : 'Check-in tại đây'}
           </Button>
 
-          {/* TODO [M4]: danh sách review + form viết review */}
+          {/* [M4] Sửa/Xóa — chỉ creator thấy (firestore.rules cũng enforce) */}
+          {exp.createdBy === user.uid && (
+            <View style={styles.ownerRow}>
+              <Button
+                mode="outlined"
+                icon="pencil"
+                onPress={() => navigation.navigate('ExperienceForm', { id })}
+                style={styles.ownerBtn}
+              >
+                Sửa
+              </Button>
+              <Button
+                mode="outlined"
+                icon="delete"
+                textColor={colors.danger}
+                onPress={onDelete}
+                style={styles.ownerBtn}
+              >
+                Xóa
+              </Button>
+            </View>
+          )}
+
+          {/* [M4] Review + rating */}
+          <ReviewSection
+            expId={id}
+            userId={user.uid}
+            onReviewAdded={() => getExperienceById(id).then(setExp)}
+            // cuộn thêm một đoạn khi form review vẫn bị bàn phím che
+            onNeedScroll={(delta) =>
+              scrollRef.current?.scrollTo({
+                y: scrollOffsetY.current + delta,
+                animated: true,
+              })
+            }
+          />
         </View>
       </ScrollView>
 
@@ -190,9 +277,13 @@ const styles = StyleSheet.create({
   addressRow: { marginBottom: spacing.lg },
   address: { ...typography.caption, lineHeight: 18 },
   checkinBtn: { marginTop: spacing.sm, borderRadius: radius.full },
+  ownerRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  ownerBtn: { flex: 1 },
   bottomBar: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
+    // modal trên iOS không có safe-area inset dưới nên phải tự đệm đủ qua vùng home indicator (~34px)
+    paddingBottom: Platform.select({ ios: spacing.xl + spacing.xs, android: spacing.md }),
     backgroundColor: colors.background,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,

@@ -1,7 +1,7 @@
 // [M4] Browse — lướt danh sách experience, phân trang
 import React, { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
-import { ActivityIndicator, Text } from 'react-native-paper';
+import { ActivityIndicator, Text, FAB } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';  
 import { listExperiences } from '../../services/experienceService';
 import ExperienceCard from '../../components/experience/ExperienceCard';
@@ -31,7 +31,9 @@ export default function BrowseScreen({ navigation }) {
   };
 
   useEffect(() => {
-    loadFirst();
+    // focus fire cả lần mount đầu + mỗi lần quay lại (vd: sau khi tạo/sửa/xóa experience)
+    const unsub = navigation.addListener('focus', loadFirst);
+    return unsub;
   }, []);
 
   if (loading) return <ActivityIndicator style={{ flex: 1 }} />;
@@ -58,6 +60,13 @@ export default function BrowseScreen({ navigation }) {
           </View>
         }
       />
+      {/* [M4] Tạo experience mới */}
+      <FAB
+        icon="plus"
+        style={styles.fab}
+        color={colors.background}
+        onPress={() => navigation.navigate('ExperienceForm')}
+      />
     </SafeAreaView>
   );
 }
@@ -67,4 +76,10 @@ const styles = StyleSheet.create({
   heading: { ...typography.title, paddingHorizontal: spacing.md, paddingBottom: spacing.sm }, // ← MỚI
   list: { padding: spacing.md, paddingTop: 0 },
   empty: { alignItems: 'center', marginTop: spacing.xl * 2 },
+  fab: {
+    position: 'absolute',
+    right: spacing.md,
+    bottom: spacing.md,
+    backgroundColor: colors.primary,
+  },
 });

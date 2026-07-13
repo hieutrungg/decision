@@ -14,7 +14,12 @@ service cloud.firestore {
       allow create: if request.auth != null
         && request.resource.data.budget is number
         && request.resource.data.budget > 0;
-      allow update, delete: if request.auth != null
+      // Creator sửa/xóa tự do; user thường chỉ được cập nhật aggregate rating khi viết review
+      allow update: if request.auth != null && (
+        resource.data.createdBy == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'reviewCount'])
+      );
+      allow delete: if request.auth != null
         && resource.data.createdBy == request.auth.uid;
     }
 

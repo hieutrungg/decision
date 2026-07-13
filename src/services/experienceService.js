@@ -7,6 +7,7 @@ import {
   getDoc,
   getDocs,
   setDoc,
+  updateDoc,
   deleteDoc,
   query,
   where,
@@ -16,15 +17,43 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../api/firebase';
+import { uploadImageToCloudinary } from '../api/cloudinary';
 import { COLLECTIONS } from '../utils/constants';
 
 export async function createExperience(data) {
   const ref = await addDoc(collection(db, COLLECTIONS.EXPERIENCES), {
     ...data,
     rating: 0,
+    reviewCount: 0,
     createdAt: serverTimestamp(),
   });
   return ref.id;
+}
+
+export async function updateExperience(expId, data) {
+  await updateDoc(doc(db, COLLECTIONS.EXPERIENCES, expId), data);
+}
+
+/** Chỉ creator mới xóa được (firestore.rules enforce). Reviews cũ giữ nguyên — chấp nhận trong scope đồ án. */
+export async function deleteExperience(expId) {
+  await deleteDoc(doc(db, COLLECTIONS.EXPERIENCES, expId));
+}
+
+/** Upload ảnh local (uri từ expo-image-picker) lên Cloudinary, trả về URL ảnh đã host */
+export async function uploadExperienceImage(localUri) {
+  return uploadImageToCloudinary(localUri);
+}
+
+/** Experience do chính user tạo — sort client-side để khỏi cần composite index */
+export async function listMyExperiences(userId) {
+  const q = query(
+    collection(db, COLLECTIONS.EXPERIENCES),
+    where('createdBy', '==', userId),
+  );
+  const snap = await getDocs(q);
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
 }
 
 export async function getExperienceById(id) {
@@ -64,6 +93,11 @@ export async function getBookmarks(userId) {
   return snap.docs.map((d) => d.id); // danh sách expId
 }
 
+/**
+ * Thêm review + cập nhật rating trung bình trên experience.
+ * Công thức tăng dần: newAvg = (avg × count + rating) / (count + 1)
+ * (rules cho phép user thường update riêng 2 field rating/reviewCount)
+ */
 export async function addReview(expId, userId, rating, comment) {
   const ref = await addDoc(collection(db, COLLECTIONS.REVIEWS), {
     expId,
@@ -72,6 +106,16 @@ export async function addReview(expId, userId, rating, comment) {
     comment,
     createdAt: serverTimestamp(),
   });
+
+  const expRef = doc(db, COLLECTIONS.EXPERIENCES, expId);
+  const expSnap = await getDoc(expRef);
+  if (expSnap.exists()) {
+    const { rating: avg = 0, reviewCount: count = 0 } = expSnap.data();
+    await updateDoc(expRef, {
+      rating: Math.round(((avg * count + rating) / (count + 1)) * 10) / 10,
+      reviewCount: count + 1,
+    });
+  }
   return ref.id;
 }
 
