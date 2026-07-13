@@ -15,18 +15,39 @@ import AchievementScreen from '../screens/social/AchievementScreen';
 import FindFriendsScreen from '../screens/social/FindFriendsScreen';
 import FollowingScreen from '../screens/social/FollowingScreen';
 import FriendProfileScreen from '../screens/social/FriendProfileScreen';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors } from '../utils/theme';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
+const TAB_ICONS = {
+  Discover: { active: 'dice-multiple', inactive: 'dice-multiple-outline' },
+  Browse: { active: 'view-grid', inactive: 'view-grid-outline' },
+  Map: { active: 'map-marker-radius', inactive: 'map-marker-radius-outline' },
+  Wishlist: { active: 'heart', inactive: 'heart-outline' },
+  Profile: { active: 'account-circle', inactive: 'account-circle-outline' },
+};
+
 function Tabs() {
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
-      }}
+        tabBarInactiveTintColor: colors.textMuted,
+        tabBarIcon: ({ focused, color, size }) => {
+          const icons = TAB_ICONS[route.name];
+          const source = focused ? icons.active : icons.inactive;
+          return (
+            <MaterialCommunityIcons
+              name={source}
+              color={color}
+              size={route.name === 'Map' ? size + 2 : size}
+            />
+          );
+        },
+      })}
     >
       <Tab.Screen name="Discover" component={DiscoverScreen} options={{ title: 'Gợi ý' }} />
       <Tab.Screen name="Browse" component={BrowseScreen} options={{ title: 'Danh sách' }} />
@@ -62,7 +83,7 @@ export default function MainTabs() {
       <Stack.Screen
         name="ExperienceForm"
         component={ExperienceFormScreen}
-        options={{ title: 'Tạo experience' }}
+        options={{ title: 'Tạo trải nghiệm' }}
       />
       <Stack.Screen
         name="Completed"

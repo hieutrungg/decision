@@ -17,7 +17,7 @@
       ],
       "config": {
         "googleMaps": {
-          "apiKey": "YOUR_GOOGLE_MAPS_ANDROID_API_KEY"
+          "apiKey": "AIzaSyCk05q4FlrDYIjjU6-d_y0bN1geUYgLxy8"
         }
       }
     },
@@ -37,7 +37,7 @@
       "firebaseStorageBucket": "random-experience3.firebasestorage.app",
       "firebaseMessagingSenderId": "904804549544",
       "firebaseAppId": "1:904804549544:web:d87ee02a453eaa0e19939d",
-      "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY"
+      "googleMapsApiKey": "AIzaSyCk05q4FlrDYIjjU6-d_y0bN1geUYgLxy8"
     }
   }
 }

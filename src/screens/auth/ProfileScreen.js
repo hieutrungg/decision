@@ -47,7 +47,7 @@ export default function ProfileScreen({ navigation }) {
 
         {/* Stats: streak + completed (bấm mở Completed) */}
         <View style={styles.statsRow}>
-          <StatCard value={profile?.streak ?? 0} label="Streak" emoji="🔥" />
+          <StatCard value={profile?.streak ?? 0} label="Chuỗi ngày" emoji="🔥" />
           <StatCard
             value={profile?.completedCount ?? 0}
             label="Đã trải nghiệm"

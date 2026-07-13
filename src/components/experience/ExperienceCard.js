@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { Card, Text, Chip } from 'react-native-paper';
 import { Image } from 'expo-image';
 import { colors, spacing, typography, radius } from '../../utils/theme';
+import { getCategoryLabel } from '../../utils/constants';
 
 export default function ExperienceCard({ experience, onPress }) {
   if (!experience) return null;
@@ -15,7 +16,7 @@ export default function ExperienceCard({ experience, onPress }) {
       <Card.Content style={styles.content}>
         <Text style={styles.title}>{experience.title}</Text>
         <View style={styles.row}>
-          <Chip compact>{experience.category}</Chip>
+          <Chip compact>{getCategoryLabel(experience.category)}</Chip>
           <Text style={styles.meta}>
             {(experience.budget / 1000).toFixed(0)}k · {experience.duration} phút · ⭐{' '}
             {experience.rating?.toFixed(1) ?? '—'}

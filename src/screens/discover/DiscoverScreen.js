@@ -50,10 +50,10 @@ export default function DiscoverScreen({ navigation }) {
 
     const normalized = error.toLowerCase();
     if (normalized.includes('index') || normalized.includes('failed-precondition')) {
-      return 'Du lieu dang chuan bi de tra loi goi y. Hay thu doi filter hoac thu lai sau.';
+      return 'Dữ liệu đang được chuẩn bị để trả lời gợi ý. Hãy đổi bộ lọc hoặc thử lại sau.';
     }
 
-    return 'Tam thoi chua lay duoc goi y. Hay doi filter hoac thu khung gio khac.';
+    return 'Tạm thời chưa lấy được gợi ý. Hãy đổi bộ lọc hoặc thử khung giờ khác.';
   }, [error]);
 
   const onShake = useCallback(() => {
@@ -95,11 +95,11 @@ export default function DiscoverScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>Toi nay lam gi?</Text>
-        <Text style={styles.hint}>Lac dien thoai de nhan goi y ngau nhien</Text>
+        <Text style={styles.title}>Tối nay làm gì?</Text>
+        <Text style={styles.hint}>Lắc điện thoại để nhận gợi ý ngẫu nhiên</Text>
 
         <Button mode="contained" onPress={() => setFilterVisible(true)} style={styles.filterBtn}>
-          Smart Filter - chon budget / thoi gian / mood
+          Bộ lọc thông minh · ngân sách / thời gian / tâm trạng
         </Button>
 
         {loading ? <ActivityIndicator style={styles.loading} /> : null}
@@ -112,7 +112,7 @@ export default function DiscoverScreen({ navigation }) {
               onViewMap={openPackageMap}
             />
             <Button mode="outlined" icon="shuffle" onPress={onRefreshSuggestion} style={styles.repeatBtn}>
-              Goi y khac
+              Gợi ý khác
             </Button>
           </View>
         ) : null}
@@ -124,7 +124,7 @@ export default function DiscoverScreen({ navigation }) {
               onPress={() => navigation.navigate('ExperienceDetail', { id: single.id })}
             />
             <Button mode="outlined" icon="shuffle" onPress={onRefreshSuggestion} style={styles.repeatBtn}>
-              Goi y khac
+              Gợi ý khác
             </Button>
           </View>
         ) : null}
@@ -132,7 +132,7 @@ export default function DiscoverScreen({ navigation }) {
         {!loading && error ? <Text style={styles.error}>{friendlyError}</Text> : null}
 
         {!loading && !single && !pkg && !error ? (
-          <Text style={styles.empty}>Chua co goi y nao. Hay doi filter hoac lac may de lay goi y khac.</Text>
+          <Text style={styles.empty}>Chưa có gợi ý nào. Hãy đổi bộ lọc hoặc lắc máy để nhận gợi ý khác.</Text>
         ) : null}
       </ScrollView>
 

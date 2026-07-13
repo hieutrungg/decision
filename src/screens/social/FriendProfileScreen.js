@@ -101,7 +101,7 @@ export default function FriendProfileScreen() {
         <Card style={styles.statCard}>
           <Card.Content>
             <Text style={styles.statNumber}>{profile.streak ?? 0}</Text>
-            <Text>🔥 Streak</Text>
+            <Text>🔥 Chuỗi ngày</Text>
           </Card.Content>
         </Card>
         <Card style={styles.statCard}>
@@ -132,8 +132,8 @@ export default function FriendProfileScreen() {
       ))}
 
       <Divider style={styles.divider} />
-      <Text style={styles.sectionTitle}>Review</Text>
-      {reviews.length === 0 && <Text style={typography.caption}>Chưa có review nào.</Text>}
+      <Text style={styles.sectionTitle}>Đánh giá</Text>
+      {reviews.length === 0 && <Text style={typography.caption}>Chưa có đánh giá nào.</Text>}
       {reviews.map((r) => (
         <Card key={r.id} style={styles.itemCard}>
           <Card.Content>

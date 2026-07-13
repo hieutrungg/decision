@@ -13,8 +13,8 @@ import { colors, spacing, typography } from '../../utils/theme';
 const CATEGORY_FILTERS = [
   { key: 'all', label: 'Tất cả' },
   { key: 'cafe', label: 'Cà phê' },
-  { key: 'workshop', label: 'Workshop' },
-  { key: 'food', label: 'Ăn uống' },
+  { key: 'workshop', label: 'Lớp trải nghiệm' },
+  { key: 'food', label: 'Ẩm thực' },
   { key: 'entertainment', label: 'Giải trí' },
 ];
 
@@ -445,8 +445,8 @@ export default function MapScreen({ navigation, route }) {
         </Text>
         <Text style={styles.message}>
           {isItineraryMode
-            ? 'Các item trong lịch trình này chưa có location hợp lệ để đặt marker.'
-            : 'Hiện chưa có địa điểm nào có tọa độ hợp lệ. Hãy nạp dữ liệu rồi mở lại màn hình này.'}
+            ? 'Các mục trong lịch trình này chưa có vị trí hợp lệ để đặt dấu trên bản đồ.'
+            : 'Hiện chưa có trải nghiệm nào có vị trí hợp lệ. Hãy thêm dữ liệu rồi mở lại màn hình này.'}
         </Text>
         <Button mode="outlined" onPress={isItineraryMode ? openAllMap : loadAllExperiences}>
           {isItineraryMode ? 'Xem bản đồ chung' : 'Tải lại'}

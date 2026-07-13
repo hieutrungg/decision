@@ -56,7 +56,7 @@ export default function BrowseScreen({ navigation }) {
         ListFooterComponent={loadingMore ? <ActivityIndicator /> : null}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text>Chưa có dữ liệu — hãy seed experiences vào Firestore</Text>
+            <Text>Chưa có dữ liệu trải nghiệm trong Firestore.</Text>
           </View>
         }
       />

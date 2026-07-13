@@ -8,6 +8,7 @@ import { getCompleted } from '../../services/socialService';
 import { getExperienceById } from '../../services/experienceService';
 import { useAuth } from '../../hooks/useAuth';
 import { spacing, typography, radius } from '../../utils/theme';
+import { getCategoryLabel } from '../../utils/constants';
 
 function formatDate(ts) {
   // completedAt là Firestore Timestamp; nếu vừa ghi xong (chưa resolve) có thể null
@@ -100,7 +101,7 @@ export default function CompletedScreen() {
               </Text>
               <Text style={styles.date}>✅ {formatDate(item.completedAt)}</Text>
               <Chip compact icon="tag" style={styles.chip}>
-                {item.exp.category}
+                {getCategoryLabel(item.exp.category)}
               </Chip>
             </View>
           </View>

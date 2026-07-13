@@ -76,7 +76,7 @@ export default function FindFriendsScreen() {
       {loading && <ActivityIndicator style={styles.loading} />}
 
       {!loading && keyword.trim() !== '' && results.length === 0 && (
-        <Text style={styles.empty}>Không tìm thấy user nào 🔍</Text>
+        <Text style={styles.empty}>Không tìm thấy người dùng nào 🔍</Text>
       )}
 
       <FlatList
@@ -93,7 +93,7 @@ export default function FindFriendsScreen() {
               <View style={styles.row}>
                 <Avatar.Text size={44} label={(item.displayName ?? '?')[0]?.toUpperCase() ?? '?'} />
                 <Text style={styles.name} numberOfLines={1}>
-                  {item.displayName || item.email || 'User'}
+                  {item.displayName || item.email || 'Người dùng'}
                 </Text>
                 <Button
                   mode={isFollowed ? 'outlined' : 'contained'}

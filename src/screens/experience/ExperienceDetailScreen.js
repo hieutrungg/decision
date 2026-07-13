@@ -31,6 +31,7 @@ import {
 import { haversineKm } from '../../api/maps';
 import { useAuth } from '../../hooks/useAuth';
 import { spacing, typography, radius, colors, shadow } from '../../utils/theme';
+import { getCategoryLabel } from '../../utils/constants';
 
 const CHECKIN_RADIUS_KM = 0.5; // 500m
 
@@ -108,7 +109,7 @@ export default function ExperienceDetailScreen({ route, navigation }) {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Cần quyền vị trí', 'Bật quyền vị trí để check-in nhé!');
+        Alert.alert('Cần quyền vị trí', 'Bật quyền vị trí để xác nhận có mặt nhé!');
         return;
       }
       const loc = await Location.getCurrentPositionAsync({});
@@ -119,7 +120,7 @@ export default function ExperienceDetailScreen({ route, navigation }) {
       if (distance > CHECKIN_RADIUS_KM) {
         Alert.alert(
           'Chưa đến nơi rồi 😅',
-          `Bạn đang cách địa điểm ${distance.toFixed(1)}km. Cần ở trong vòng 500m để check-in.`,
+          `Bạn đang cách địa điểm ${distance.toFixed(1)}km. Cần ở trong vòng 500m để xác nhận có mặt.`,
         );
         return;
       }
@@ -136,9 +137,9 @@ export default function ExperienceDetailScreen({ route, navigation }) {
 
       if (newBadges.length > 0) {
         const names = newBadges.map((b) => `🏅 ${b.title}`).join('\n');
-        Alert.alert('Check-in thành công! 🎉', `Streak: ${newStreak}\n\nBạn vừa đạt:\n${names}`);
+        Alert.alert('Xác nhận thành công! 🎉', `Chuỗi ngày: ${newStreak}\n\nBạn vừa đạt:\n${names}`);
       } else {
-        Alert.alert('Check-in thành công! 🎉', `Streak của bạn hiện là ${newStreak}.`);
+        Alert.alert('Xác nhận thành công! 🎉', `Chuỗi ngày của bạn hiện là ${newStreak}.`);
       }
     } catch (e) {
       Alert.alert('Lỗi', e.message);
@@ -148,7 +149,7 @@ export default function ExperienceDetailScreen({ route, navigation }) {
   };
 
   const onDelete = () => {
-    Alert.alert('Xóa experience?', 'Hành động này không thể hoàn tác.', [
+    Alert.alert('Xóa trải nghiệm?', 'Hành động này không thể hoàn tác.', [
       { text: 'Hủy', style: 'cancel' },
       {
         text: 'Xóa',
@@ -217,7 +218,7 @@ export default function ExperienceDetailScreen({ route, navigation }) {
 
           <View style={styles.row}>
             <Chip icon="tag" compact style={styles.chip}>
-              {exp.category}
+              {getCategoryLabel(exp.category)}
             </Chip>
             <Chip icon="cash" compact style={styles.chip}>
               {(exp.budget / 1000).toFixed(0)}k
@@ -244,7 +245,7 @@ export default function ExperienceDetailScreen({ route, navigation }) {
             disabled={completed}
             style={styles.checkinBtn}
           >
-            {completed ? '✅ Đã trải nghiệm' : 'Check-in tại đây'}
+            {completed ? '✅ Đã trải nghiệm' : 'Xác nhận có mặt'}
           </Button>
 
           {/* [M4] Sửa/Xóa — chỉ creator thấy (firestore.rules cũng enforce) */}

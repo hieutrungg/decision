@@ -12,7 +12,7 @@ import {
   uploadExperienceImage,
 } from '../../services/experienceService';
 import { useAuth } from '../../hooks/useAuth';
-import { CATEGORIES, MOODS } from '../../utils/constants';
+import { CATEGORIES, MOODS, getCategoryLabel } from '../../utils/constants';
 import { colors, spacing, typography, radius } from '../../utils/theme';
 
 export default function ExperienceFormScreen({ route, navigation }) {
@@ -36,11 +36,11 @@ export default function ExperienceFormScreen({ route, navigation }) {
   const [existingImage, setExistingImage] = useState(null); // URL đã có (edit mode)
 
   useEffect(() => {
-    navigation.setOptions({ title: isEdit ? 'Sửa experience' : 'Tạo experience' });
+    navigation.setOptions({ title: isEdit ? 'Sửa trải nghiệm' : 'Tạo trải nghiệm' });
     if (!isEdit) return;
     getExperienceById(expId).then((exp) => {
       if (!exp) {
-        Alert.alert('Lỗi', 'Không tìm thấy experience này.');
+        Alert.alert('Lỗi', 'Không tìm thấy trải nghiệm này.');
         navigation.goBack();
         return;
       }
@@ -90,13 +90,13 @@ export default function ExperienceFormScreen({ route, navigation }) {
   const onSubmit = async () => {
     const budgetNum = Number(budget);
     const durationNum = Number(duration);
-    if (!title.trim()) return Alert.alert('Thiếu thông tin', 'Nhập tên experience nhé.');
+    if (!title.trim()) return Alert.alert('Thiếu thông tin', 'Nhập tên trải nghiệm nhé.');
     if (!budgetNum || budgetNum <= 0)
-      return Alert.alert('Thiếu thông tin', 'Budget phải là số lớn hơn 0 (VNĐ).');
+      return Alert.alert('Thiếu thông tin', 'Ngân sách phải là số lớn hơn 0 (VNĐ).');
     if (!durationNum || durationNum <= 0)
       return Alert.alert('Thiếu thông tin', 'Thời lượng phải là số phút lớn hơn 0.');
     if (moods.length === 0)
-      return Alert.alert('Thiếu thông tin', 'Chọn ít nhất 1 mood cho experience.');
+      return Alert.alert('Thiếu thông tin', 'Chọn ít nhất một tâm trạng cho trải nghiệm.');
 
     setSaving(true);
     try {
@@ -123,7 +123,7 @@ export default function ExperienceFormScreen({ route, navigation }) {
       } else {
         await createExperience({ ...data, createdBy: user.uid });
       }
-      Alert.alert(isEdit ? 'Đã cập nhật! ✅' : 'Đã tạo experience! 🎉', '', [
+      Alert.alert(isEdit ? 'Đã cập nhật! ✅' : 'Đã tạo trải nghiệm! 🎉', '', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (e) {
@@ -140,7 +140,7 @@ export default function ExperienceFormScreen({ route, navigation }) {
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <TextInput
-        label="Tên experience *"
+        label="Tên trải nghiệm *"
         value={title}
         onChangeText={setTitle}
         mode="outlined"
@@ -160,14 +160,14 @@ export default function ExperienceFormScreen({ route, navigation }) {
       <View style={styles.chipRow}>
         {CATEGORIES.map((c) => (
           <Chip key={c} selected={category === c} onPress={() => setCategory(c)} style={styles.chip}>
-            {c}
+            {getCategoryLabel(c)}
           </Chip>
         ))}
       </View>
 
       <View style={styles.row2}>
         <TextInput
-          label="Budget (VNĐ) *"
+          label="Ngân sách (VNĐ) *"
           value={budget}
           onChangeText={setBudget}
           mode="outlined"
@@ -184,7 +184,7 @@ export default function ExperienceFormScreen({ route, navigation }) {
         />
       </View>
 
-      <Text style={styles.label}>Mood (chọn 1 hoặc nhiều) *</Text>
+      <Text style={styles.label}>Tâm trạng (chọn một hoặc nhiều) *</Text>
       <View style={styles.chipRow}>
         {MOODS.map((m) => (
           <Chip
@@ -228,7 +228,7 @@ export default function ExperienceFormScreen({ route, navigation }) {
         disabled={saving}
         style={styles.submit}
       >
-        {isEdit ? 'Lưu thay đổi' : 'Tạo experience'}
+        {isEdit ? 'Lưu thay đổi' : 'Tạo trải nghiệm'}
       </Button>
     </ScrollView>
   );

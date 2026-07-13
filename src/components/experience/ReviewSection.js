@@ -81,7 +81,7 @@ export default function ReviewSection({ expId, userId, onReviewAdded, onNeedScro
       <Text style={styles.heading}>Đánh giá ({reviews.length})</Text>
 
       {alreadyReviewed ? (
-        <Text style={styles.reviewed}>✅ Bạn đã đánh giá experience này</Text>
+        <Text style={styles.reviewed}>✅ Bạn đã đánh giá trải nghiệm này</Text>
       ) : (
         <View style={styles.form} ref={formRef}>
           <Stars value={rating} size={26} onChange={setRating} />

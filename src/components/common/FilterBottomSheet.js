@@ -67,7 +67,7 @@ export default function FilterBottomSheet({ visible, onClose, onApply, initialVa
           ))}
         </View>
 
-        <Text style={styles.label}>🎭 Mood</Text>
+        <Text style={styles.label}>🎭 Tâm trạng</Text>
         <View style={styles.row}>
           {MOODS.map((m) => (
             <Chip key={m.key} selected={mood.key === m.key} onPress={() => setMood(m)}>

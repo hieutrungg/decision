@@ -48,7 +48,7 @@ export default function WishlistScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <Text style={styles.title}>Wishlist 🔖</Text>
+      <Text style={styles.title}>Danh sách đã lưu 🔖</Text>
       {loading ? (
         <View style={styles.skeletonWrap}>
           <CardSkeleton count={2} />
@@ -71,7 +71,7 @@ export default function WishlistScreen({ navigation }) {
             <EmptyState
               emoji="🔖"
               title="Chưa lưu địa điểm nào"
-              description="Bấm “Lưu vào Wishlist” ở màn chi tiết để cất giữ những nơi bạn muốn ghé."
+              description="Bấm “Lưu” ở màn chi tiết để giữ lại những nơi bạn muốn ghé."
               actionLabel="Khám phá ngay"
               onAction={() => navigation.navigate('Discover')}
             />

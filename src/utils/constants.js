@@ -1,6 +1,15 @@
 // src/utils/constants.js
 export const CATEGORIES = ['cafe', 'workshop', 'food', 'entertainment'];
 
+export const CATEGORY_LABELS = {
+  cafe: 'Cà phê',
+  workshop: 'Lớp trải nghiệm',
+  food: 'Ẩm thực',
+  entertainment: 'Giải trí',
+};
+
+export const getCategoryLabel = (category) => CATEGORY_LABELS[category] ?? category;
+
 export const MOODS = [
   { key: 'relax', label: 'Thư giãn', emoji: '😌' },
   { key: 'energetic', label: 'Năng động', emoji: '⚡' },

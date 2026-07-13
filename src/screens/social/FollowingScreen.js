@@ -46,9 +46,9 @@ export default function FollowingScreen() {
             <Avatar.Text size={44} label={(item.displayName ?? '?')[0]?.toUpperCase() ?? '?'} />
             <View style={styles.info}>
               <Text style={typography.subtitle} numberOfLines={1}>
-                {item.displayName || item.email || 'User'}
+                {item.displayName || item.email || 'Người dùng'}
               </Text>
-              <Text style={typography.caption}>🔥 Streak {item.streak ?? 0}</Text>
+              <Text style={typography.caption}>🔥 Chuỗi ngày: {item.streak ?? 0}</Text>
             </View>
           </View>
         </Card>

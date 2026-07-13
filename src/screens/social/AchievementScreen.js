@@ -82,7 +82,7 @@ export default function AchievementScreen() {
                     {item.title}
                   </Text>
                   <Chip compact style={earned ? styles.stateEarned : styles.stateLocked} textStyle={styles.stateText}>
-                    {earned ? 'Unlocked' : 'Locked'}
+                    {earned ? 'Đã mở khóa' : 'Chưa mở khóa'}
                   </Chip>
                 </View>
                 <Text style={[typography.caption, !earned && styles.textLocked]}>

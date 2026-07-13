@@ -2,6 +2,7 @@
 import { StyleSheet, View, Pressable } from 'react-native';
 import { Button, Card, Divider, Text } from 'react-native-paper';
 import { colors, spacing, typography } from '../../utils/theme';
+import { getCategoryLabel } from '../../utils/constants';
 
 export default function PackageCard({ pkg, onItemPress, onViewMap }) {
   if (!pkg?.items?.length) return null;
@@ -9,7 +10,7 @@ export default function PackageCard({ pkg, onItemPress, onViewMap }) {
   return (
     <Card style={styles.card}>
       <Card.Content>
-        <Text style={styles.header}>Kich ban cho buoi toi cua ban</Text>
+        <Text style={styles.header}>Kịch bản cho buổi tối của bạn</Text>
 
         {pkg.items.map((item, index) => (
           <View key={item.id}>
@@ -19,9 +20,9 @@ export default function PackageCard({ pkg, onItemPress, onViewMap }) {
                 <View style={styles.info}>
                   <Text style={styles.title}>{item.title}</Text>
                   <Text style={styles.meta}>
-                    {item.category} · {item.duration} phut · {(item.budget / 1000).toFixed(0)}k
+                    {getCategoryLabel(item.category)} · {item.duration} phút · {(item.budget / 1000).toFixed(0)}k
                   </Text>
-                  <Text style={styles.meta}>Dia diem: {item.location?.address}</Text>
+                  <Text style={styles.meta}>Địa điểm: {item.location?.address}</Text>
                 </View>
               </View>
             </Pressable>
@@ -32,11 +33,11 @@ export default function PackageCard({ pkg, onItemPress, onViewMap }) {
         <Divider style={styles.divider} />
 
         <Text style={styles.total}>
-          Tong: ~{(pkg.totalBudget / 1000).toFixed(0)}k · {Math.round(pkg.totalDuration / 60)} tieng
+          Tổng: ~{(pkg.totalBudget / 1000).toFixed(0)}k · {Math.round(pkg.totalDuration / 60)} tiếng
         </Text>
 
         <Button mode="outlined" icon="map" onPress={() => onViewMap?.(pkg.items)} style={styles.mapButton}>
-          Xem tren ban do
+          Xem trên bản đồ
         </Button>
       </Card.Content>
     </Card>
