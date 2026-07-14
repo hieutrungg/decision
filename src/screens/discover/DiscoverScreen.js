@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, ScrollView, View } from 'react-native';
 import { ActivityIndicator, Button, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,7 +11,7 @@ import PackageCard from '../../components/experience/PackageCard';
 import ExperienceCard from '../../components/experience/ExperienceCard';
 import FilterBottomSheet from '../../components/common/FilterBottomSheet';
 import { spacing, typography, colors } from '../../utils/theme';
-import { getCurrentTimeSlot } from '../../utils/timeSlot';
+import { getCurrentTimeSlot, getTimeSlotQuestion } from '../../utils/timeSlot';
 import { DURATION_PRESETS } from '../../utils/constants';
 
 function toItineraryItems(items = []) {
@@ -31,7 +31,21 @@ export default function DiscoverScreen({ navigation }) {
   const { profile } = useUser();
   const [filterVisible, setFilterVisible] = useState(false);
   const [lastRequest, setLastRequest] = useState(null);
+  const [currentTimeSlot, setCurrentTimeSlot] = useState(() => getCurrentTimeSlot());
   const { lastFilter, saveLastFilter } = useLastFilter();
+
+  useEffect(() => {
+    if (!isFocused) return;
+
+    const syncCurrentTimeSlot = () => {
+      const next = getCurrentTimeSlot();
+      setCurrentTimeSlot((current) => (current.key === next.key ? current : next));
+    };
+
+    syncCurrentTimeSlot();
+    const timer = setInterval(syncCurrentTimeSlot, 60_000);
+    return () => clearInterval(timer);
+  }, [isFocused]);
 
   const getDefaultFilters = useCallback(
     () => ({
@@ -95,7 +109,7 @@ export default function DiscoverScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>Tối nay làm gì?</Text>
+        <Text style={styles.title}>{getTimeSlotQuestion(currentTimeSlot)}</Text>
         <Text style={styles.hint}>Lắc điện thoại để nhận gợi ý ngẫu nhiên</Text>
 
         <Button mode="contained" onPress={() => setFilterVisible(true)} style={styles.filterBtn}>
