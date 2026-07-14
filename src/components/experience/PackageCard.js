@@ -10,7 +10,7 @@ export default function PackageCard({ pkg, onItemPress, onViewMap }) {
   return (
     <Card style={styles.card}>
       <Card.Content>
-        <Text style={styles.header}>Kịch bản cho buổi tối của bạn</Text>
+        <Text style={styles.header}>Lịch trình dành cho bạn</Text>
 
         {pkg.items.map((item, index) => (
           <View key={item.id}>

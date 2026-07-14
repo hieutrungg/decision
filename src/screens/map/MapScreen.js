@@ -263,13 +263,16 @@ export default function MapScreen({ navigation, route }) {
   }, [itineraryItems, itineraryKey, loadAllExperiences, loadItinerary, refreshKey, routeMode]);
 
   useEffect(() => {
-    if (routeMode !== 'itinerary') {
-      setRouteCoordinates([]);
-      setRouteError('');
-      setRouteLoading(false);
-      setSelectedRouteIds([]);
-      return;
-    }
+    if (routeMode === 'itinerary') return;
+
+    setRouteCoordinates([]);
+    setRouteError('');
+    setRouteLoading(false);
+    setSelectedRouteIds([]);
+  }, [routeMode]);
+
+  useEffect(() => {
+    if (routeMode !== 'itinerary') return;
 
     if (selectedRoutePoints.length !== 2) {
       setRouteCoordinates([]);

@@ -12,3 +12,20 @@ export function getTimeSlotByHour(hour) {
 }
 
 export const getCurrentTimeSlot = () => getTimeSlotByHour(new Date().getHours());
+
+export function getTimeSlotQuestion(slot = getCurrentTimeSlot()) {
+  switch (slot?.key) {
+    case 'morning':
+      return 'Sáng nay làm gì nhỉ?';
+    case 'noon':
+      return 'Trưa nay làm gì nhỉ?';
+    case 'afternoon':
+      return 'Chiều nay làm gì nhỉ?';
+    case 'evening':
+      return 'Tối nay làm gì nhỉ?';
+    case 'night':
+      return 'Đêm nay làm gì nhỉ?';
+    default:
+      return 'Làm gì bây giờ nhỉ?';
+  }
+}

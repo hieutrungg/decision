@@ -6,7 +6,7 @@ import { Text, Button, Chip } from 'react-native-paper';
 import { MOODS, BUDGET_PRESETS, DURATION_PRESETS } from '../../utils/constants';
 import { colors, spacing, typography, radius } from '../../utils/theme';
 import { TIME_SLOTS } from '../../utils/constants';
-import { getCurrentTimeSlot } from '../../utils/timeSlot';
+import { getCurrentTimeSlot, getTimeSlotQuestion } from '../../utils/timeSlot';
 
 function resolveBudgetPreset(value) {
   return BUDGET_PRESETS.find((preset) => preset.max === value) ?? BUDGET_PRESETS[1];
@@ -47,7 +47,7 @@ export default function FilterBottomSheet({ visible, onClose, onApply, initialVa
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
       <View style={styles.sheet}>
-        <Text style={styles.heading}>Bạn muốn gì tối nay?</Text>
+        <Text style={styles.heading}>{getTimeSlotQuestion(timeSlot)}</Text>
 
         <Text style={styles.label}>💰 Ngân sách</Text>
         <View style={styles.row}>

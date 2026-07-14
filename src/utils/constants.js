@@ -44,7 +44,7 @@ export const BUDGET_PRESETS = [
 export const DURATION_PRESETS = [
   { key: '1h', label: '1 tiếng', minutes: 60 },
   { key: '3h', label: '3 tiếng', minutes: 180 },
-  { key: 'evening', label: 'Cả buổi tối', minutes: 300 },
+  { key: '5h', label: 'Cả buổi', minutes: 300 },
 ];
 
 // Ngưỡng gia tốc để tính là "lắc" (m/s^2, đã trừ trọng lực ~1g)
