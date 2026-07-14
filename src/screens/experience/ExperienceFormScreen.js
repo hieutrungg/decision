@@ -1,6 +1,13 @@
 // [M4] Form tạo / sửa experience — route param `id` có giá trị = chế độ Edit
 import React, { useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View, Alert } from 'react-native';
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  Alert,
+  Keyboard,
+  TextInput as RNTextInput,
+} from 'react-native';
 import { Text, TextInput, Button, Chip, ActivityIndicator } from 'react-native-paper';
 import { Image } from 'expo-image';
 import MapView, { Marker } from 'react-native-maps';
@@ -41,6 +48,47 @@ export default function ExperienceFormScreen({ route, navigation }) {
   const [imageUri, setImageUri] = useState(null); // uri local mới chọn
   const [existingImage, setExistingImage] = useState(null); // URL đã có (edit mode)
   const mapRef = useRef(null);
+  const scrollRef = useRef(null);
+  const scrollY = useRef(0);
+  // đệm đáy khi mở bàn phím để luôn có chỗ cuộn ô input cuối lên
+  const [kbPad, setKbPad] = useState(0);
+
+  // Auto-scroll có sẵn của RN (kiến trúc mới) đang cuộn quá đà làm mất ô input.
+  // Tự xử: bàn phím mở xong thì đo vị trí ô đang focus rồi cuộn về đúng chỗ —
+  // bị che thì kéo lên vừa đủ, bị đẩy quá cao thì kéo ngược xuống.
+  useEffect(() => {
+    const HEADER_SAFE = 120; // không để input chui lên sát header
+    const KB_MARGIN = 24; // lề cách mép bàn phím
+
+    const show = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKbPad(spacing.xl * 4);
+      // chờ cú cuộn tự động của RN chạy xong rồi mới đo và sửa lại
+      setTimeout(() => {
+        const input = RNTextInput.State.currentlyFocusedInput();
+        if (!input) return;
+        input.measureInWindow((x, y, w, h) => {
+          const kbTop = e.endCoordinates.screenY;
+          let delta = 0;
+          if (y + h > kbTop - KB_MARGIN) {
+            delta = y + h - (kbTop - KB_MARGIN); // input bị bàn phím che → cuộn lên
+          } else if (y < HEADER_SAFE) {
+            delta = y - HEADER_SAFE; // bị cuộn quá đà lên cao → cuộn ngược xuống (delta âm)
+          }
+          if (delta !== 0) {
+            scrollRef.current?.scrollTo({
+              y: Math.max(0, scrollY.current + delta),
+              animated: true,
+            });
+          }
+        });
+      }, 250);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKbPad(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   useEffect(() => {
     navigation.setOptions({ title: isEdit ? 'Sửa trải nghiệm' : 'Tạo trải nghiệm' });
@@ -197,7 +245,15 @@ export default function ExperienceFormScreen({ route, navigation }) {
   const previewImage = imageUri ?? existingImage;
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      ref={scrollRef}
+      contentContainerStyle={[styles.container, kbPad > 0 && { paddingBottom: kbPad }]}
+      keyboardShouldPersistTaps="handled"
+      onScroll={(e) => {
+        scrollY.current = e.nativeEvent.contentOffset.y;
+      }}
+      scrollEventThrottle={16}
+    >
       <TextInput
         label="Tên trải nghiệm *"
         value={title}
