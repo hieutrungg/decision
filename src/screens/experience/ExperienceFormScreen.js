@@ -1,6 +1,13 @@
 // [M4] Form tạo / sửa experience — route param `id` có giá trị = chế độ Edit
 import React, { useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View, Alert } from 'react-native';
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  Alert,
+  Keyboard,
+  TextInput as RNTextInput,
+} from 'react-native';
 import { Text, TextInput, Button, Chip, ActivityIndicator } from 'react-native-paper';
 import { Image } from 'expo-image';
 import MapView, { Marker } from 'react-native-maps';
@@ -13,7 +20,13 @@ import {
   uploadExperienceImage,
 } from '../../services/experienceService';
 import { useAuth } from '../../hooks/useAuth';
-import { CATEGORIES, MOODS, getCategoryLabel, DEFAULT_MAP_REGION } from '../../utils/constants';
+import {
+  CATEGORIES,
+  MOODS,
+  TIME_SLOTS,
+  getCategoryLabel,
+  DEFAULT_MAP_REGION,
+} from '../../utils/constants';
 import { colors, spacing, typography, radius } from '../../utils/theme';
 
 // giá trị chip "Khác" — không nằm trong CATEGORIES để các màn filter không bị lẫn
@@ -36,11 +49,49 @@ export default function ExperienceFormScreen({ route, navigation }) {
   const [budget, setBudget] = useState('');
   const [duration, setDuration] = useState('');
   const [moods, setMoods] = useState([]);
+  const [timeSlots, setTimeSlots] = useState([]); // rỗng = phù hợp mọi khung giờ
   const [address, setAddress] = useState('');
   const [coords, setCoords] = useState(null); // { lat, lng }
+  const [suggestedAddress, setSuggestedAddress] = useState(null); // địa chỉ đầy đủ tra từ ghim
   const [imageUri, setImageUri] = useState(null); // uri local mới chọn
   const [existingImage, setExistingImage] = useState(null); // URL đã có (edit mode)
   const mapRef = useRef(null);
+  const scrollRef = useRef(null);
+  const scrollY = useRef(0);
+
+  // Auto-scroll có sẵn của RN (kiến trúc mới) đang cuộn quá đà làm mất ô input.
+  // Tự xử: bàn phím mở xong thì đo vị trí ô đang focus rồi cuộn về đúng chỗ —
+  // bị che thì kéo lên vừa đủ, bị đẩy quá cao thì kéo ngược xuống.
+  // (Không đệm thêm đáy như màn Detail — dưới ô input cuối của form còn cả khối
+  // bản đồ + nút nên luôn đủ chỗ cuộn; đệm thừa gây ra khoảng trống dài khó kéo lại.)
+  useEffect(() => {
+    const HEADER_SAFE = 120; // không để input chui lên sát header
+    const KB_MARGIN = 24; // lề cách mép bàn phím
+
+    const show = Keyboard.addListener('keyboardDidShow', (e) => {
+      // chờ cú cuộn tự động của RN chạy xong rồi mới đo và sửa lại
+      setTimeout(() => {
+        const input = RNTextInput.State.currentlyFocusedInput();
+        if (!input) return;
+        input.measureInWindow((x, y, w, h) => {
+          const kbTop = e.endCoordinates.screenY;
+          let delta = 0;
+          if (y + h > kbTop - KB_MARGIN) {
+            delta = y + h - (kbTop - KB_MARGIN); // input bị bàn phím che → cuộn lên
+          } else if (y < HEADER_SAFE) {
+            delta = y - HEADER_SAFE; // bị cuộn quá đà lên cao → cuộn ngược xuống (delta âm)
+          }
+          if (delta !== 0) {
+            scrollRef.current?.scrollTo({
+              y: Math.max(0, scrollY.current + delta),
+              animated: true,
+            });
+          }
+        });
+      }, 250);
+    });
+    return () => show.remove();
+  }, []);
 
   useEffect(() => {
     navigation.setOptions({ title: isEdit ? 'Sửa trải nghiệm' : 'Tạo trải nghiệm' });
@@ -64,6 +115,7 @@ export default function ExperienceFormScreen({ route, navigation }) {
       setBudget(String(exp.budget ?? ''));
       setDuration(String(exp.duration ?? ''));
       setMoods(exp.mood ?? []);
+      setTimeSlots(exp.timeSlots ?? []);
       setAddress(exp.location?.address ?? '');
       if (exp.location?.lat) setCoords({ lat: exp.location.lat, lng: exp.location.lng });
       setExistingImage(exp.images?.[0] ?? null);
@@ -85,6 +137,9 @@ export default function ExperienceFormScreen({ route, navigation }) {
   const toggleMood = (key) =>
     setMoods((prev) => (prev.includes(key) ? prev.filter((m) => m !== key) : [...prev, key]));
 
+  const toggleTimeSlot = (key) =>
+    setTimeSlots((prev) => (prev.includes(key) ? prev.filter((t) => t !== key) : [...prev, key]));
+
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -95,9 +150,35 @@ export default function ExperienceFormScreen({ route, navigation }) {
     if (!result.canceled) setImageUri(result.assets[0].uri);
   };
 
+  // Ghép các mảnh reverse geocode thành địa chỉ dễ đọc: "85 Phố Thái Hà, Đống Đa, Hà Nội"
+  const buildAddress = (g) => {
+    const parts = [];
+    if (g.name) parts.push(g.name);
+    // name thường đã chứa số nhà + tên đường — chỉ thêm street nếu chưa có
+    if (g.street && !(g.name ?? '').includes(g.street)) {
+      parts.push(g.streetNumber ? `${g.streetNumber} ${g.street}` : g.street);
+    }
+    const district = g.district ?? g.subregion;
+    if (district) parts.push(district);
+    const city = g.city ?? g.region;
+    if (city) parts.push(city);
+    return parts.filter(Boolean).join(', ');
+  };
+
+  // Mọi đường đặt ghim đều đi qua đây: lưu tọa độ + tra ngược địa chỉ đầy đủ để gợi ý
+  const setPin = async (lat, lng) => {
+    setCoords({ lat, lng });
+    try {
+      const [geo] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+      setSuggestedAddress(geo ? buildAddress(geo) : null);
+    } catch {
+      setSuggestedAddress(null); // tra không được thì thôi, không làm phiền user
+    }
+  };
+
   // đặt ghim + trượt bản đồ tới vị trí mới
   const moveTo = (lat, lng) => {
-    setCoords({ lat, lng });
+    setPin(lat, lng);
     mapRef.current?.animateToRegion(
       { latitude: lat, longitude: lng, latitudeDelta: 0.01, longitudeDelta: 0.01 },
       350,
@@ -154,6 +235,8 @@ export default function ExperienceFormScreen({ route, navigation }) {
       return Alert.alert('Thiếu thông tin', 'Thời lượng phải là số phút lớn hơn 0.');
     if (moods.length === 0)
       return Alert.alert('Thiếu thông tin', 'Chọn ít nhất một tâm trạng cho trải nghiệm.');
+    if (timeSlots.length === 0)
+      return Alert.alert('Thiếu thông tin', 'Chọn ít nhất một khung giờ phù hợp.');
     if (!address.trim())
       return Alert.alert('Thiếu thông tin', 'Nhập địa chỉ của địa điểm nhé.');
 
@@ -169,6 +252,7 @@ export default function ExperienceFormScreen({ route, navigation }) {
         budget: budgetNum,
         duration: durationNum,
         mood: moods,
+        timeSlots, // validate đã đảm bảo ≥1 buổi (data seed cũ không có field này = mọi khung giờ)
         images: imageUrl ? [imageUrl] : [],
         location: {
           address: address.trim(),
@@ -197,7 +281,15 @@ export default function ExperienceFormScreen({ route, navigation }) {
   const previewImage = imageUri ?? existingImage;
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      ref={scrollRef}
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+      onScroll={(e) => {
+        scrollY.current = e.nativeEvent.contentOffset.y;
+      }}
+      scrollEventThrottle={16}
+    >
       <TextInput
         label="Tên trải nghiệm *"
         value={title}
@@ -273,21 +365,29 @@ export default function ExperienceFormScreen({ route, navigation }) {
         ))}
       </View>
 
+      <Text style={styles.label}>Khung giờ phù hợp (chọn một hoặc nhiều) *</Text>
+      <View style={styles.chipRow}>
+        {TIME_SLOTS.map((t) => (
+          <Chip
+            key={t.key}
+            selected={timeSlots.includes(t.key)}
+            onPress={() => toggleTimeSlot(t.key)}
+            style={styles.chip}
+          >
+            {t.emoji} {t.label}
+          </Chip>
+        ))}
+      </View>
+
       <TextInput
         label="Địa chỉ *"
         value={address}
-        onChangeText={setAddress}
+        // multiline để địa chỉ dài tự xuống dòng trong khung (1 dòng bị tràn vỡ viền);
+        // chặn ký tự xuống dòng để data địa chỉ luôn là 1 chuỗi phẳng
+        onChangeText={(t) => setAddress(t.replace(/\n/g, ' '))}
         mode="outlined"
+        multiline
         style={styles.input}
-        right={
-          <TextInput.Icon
-            icon="map-search"
-            onPress={searchAddressOnMap}
-            forceTextInputFocus={false}
-          />
-        }
-        onSubmitEditing={searchAddressOnMap}
-        returnKeyType="search"
       />
       <View style={styles.locationRow}>
         <Button
@@ -322,21 +422,26 @@ export default function ExperienceFormScreen({ route, navigation }) {
           initialRegion={DEFAULT_MAP_REGION}
           onPress={(e) => {
             const { latitude, longitude } = e.nativeEvent.coordinate;
-            setCoords({ lat: latitude, lng: longitude });
+            // setState ngay trong callback sự kiện của map gây vòng lặp update
+            // trên kiến trúc mới → đẩy sang frame kế tiếp
+            requestAnimationFrame(() => setPin(latitude, longitude));
           }}
         >
-          {coords && (
-            <Marker
-              coordinate={{ latitude: coords.lat, longitude: coords.lng }}
-              draggable
-              onDragEnd={(e) =>
-                setCoords({
-                  lat: e.nativeEvent.coordinate.latitude,
-                  lng: e.nativeEvent.coordinate.longitude,
-                })
-              }
-            />
-          )}
+          {/* Marker luôn mounted (ẩn bằng opacity khi chưa có tọa độ) —
+              mount/unmount con của MapView trên kiến trúc mới gây "maximum update depth" */}
+          <Marker
+            coordinate={{
+              latitude: coords?.lat ?? DEFAULT_MAP_REGION.latitude,
+              longitude: coords?.lng ?? DEFAULT_MAP_REGION.longitude,
+            }}
+            opacity={coords ? 1 : 0}
+            draggable={!!coords}
+            tracksViewChanges={false}
+            onDragEnd={(e) => {
+              const { latitude, longitude } = e.nativeEvent.coordinate;
+              requestAnimationFrame(() => setPin(latitude, longitude));
+            }}
+          />
         </MapView>
       </View>
       <Text style={styles.mapHint}>
@@ -344,6 +449,18 @@ export default function ExperienceFormScreen({ route, navigation }) {
           ? `📍 (${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}) — chạm bản đồ hoặc kéo ghim để chỉnh`
           : 'Tìm địa chỉ hoặc chạm lên bản đồ để đặt ghim vị trí'}
       </Text>
+
+      {/* Địa chỉ đầy đủ tra ngược từ ghim — bấm để điền vào ô địa chỉ */}
+      {!!suggestedAddress && suggestedAddress !== address.trim() && (
+        <View style={styles.suggestRow}>
+          <Text style={styles.suggestText} numberOfLines={2}>
+            📮 {suggestedAddress}
+          </Text>
+          <Button mode="text" compact onPress={() => setAddress(suggestedAddress)}>
+            Dùng địa chỉ này
+          </Button>
+        </View>
+      )}
 
       <Text style={styles.label}>Ảnh</Text>
       {previewImage && <Image source={previewImage} style={styles.preview} contentFit="cover" />}
@@ -375,7 +492,17 @@ const styles = StyleSheet.create({
   locationRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   mapWrap: { borderRadius: radius.md, overflow: 'hidden', marginBottom: spacing.sm },
   map: { width: '100%', height: 220 },
-  mapHint: { ...typography.caption, marginBottom: spacing.md },
+  mapHint: { ...typography.caption, marginBottom: spacing.sm },
+  suggestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    paddingLeft: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  suggestText: { ...typography.caption, flex: 1, marginRight: spacing.sm },
   preview: { width: '100%', height: 180, borderRadius: radius.md, marginBottom: spacing.sm },
   btn: { marginBottom: spacing.md },
   submit: { marginTop: spacing.sm },
