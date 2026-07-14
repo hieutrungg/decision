@@ -33,30 +33,35 @@ export default function FriendProfileScreen() {
   const [reviews, setReviews] = useState(null);
 
   const load = useCallback(async () => {
-    const [p, followState, activity, myReviews] = await Promise.all([
-      getUserProfile(uid),
-      isFollowing(user.uid, uid),
-      getUserActivity(uid),
-      getReviewsByUser(uid),
-    ]);
-    setProfile(p);
-    setFollowed(followState);
+    try {
+      const [p, followState, activity, myReviews] = await Promise.all([
+        getUserProfile(uid),
+        isFollowing(user.uid, uid),
+        getUserActivity(uid),
+        getReviewsByUser(uid),
+      ]);
+      setProfile(p);
+      setFollowed(followState);
 
-    const withDetails = await Promise.all(
-      activity.map(async (c) => {
-        const exp = await getExperienceById(c.expId);
-        return exp ? { ...c, exp } : null;
-      }),
-    );
-    setCompleted(withDetails.filter(Boolean));
+      const withDetails = await Promise.all(
+        activity.map(async (c) => {
+          const exp = await getExperienceById(c.expId);
+          return exp ? { ...c, exp } : null;
+        }),
+      );
+      setCompleted(withDetails.filter(Boolean));
 
-    const reviewsWithExp = await Promise.all(
-      myReviews.map(async (r) => {
-        const exp = await getExperienceById(r.expId);
-        return { ...r, expTitle: exp?.title ?? '(trải nghiệm đã bị xoá)' };
-      }),
-    );
-    setReviews(reviewsWithExp);
+      const reviewsWithExp = await Promise.all(
+        myReviews.map(async (r) => {
+          const exp = await getExperienceById(r.expId);
+          return { ...r, expTitle: exp?.title ?? '(trải nghiệm đã bị xoá)' };
+        }),
+      );
+      setReviews(reviewsWithExp);
+    } catch (e) {
+      console.error('FriendProfile load error:', e); // ← xem log này
+      Alert.alert('Lỗi', 'Không tải được trang cá nhân.');
+    }
   }, [uid, user.uid]);
 
   useEffect(() => {
