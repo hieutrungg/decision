@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Modal, Pressable, StyleSheet, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import polyline from '@mapbox/polyline';
 import * as Location from 'expo-location';
@@ -97,6 +97,22 @@ function getRouteSummary(routeData, points) {
   return { distanceKm: 0, durationMin: 0, legs: 0 };
 }
 
+function buildGoogleMapsDirectionsUrl(points) {
+  if (!Array.isArray(points) || points.length < 2) return '';
+
+  const origin = `${points[0].lat},${points[0].lng}`;
+  const destination = `${points[points.length - 1].lat},${points[points.length - 1].lng}`;
+  const waypoints = points.slice(1, -1).map((point) => `${point.lat},${point.lng}`).join('|');
+  let url = `https://www.google.com/maps/dir/?api=1`;
+  url += `&origin=${encodeURIComponent(origin)}`;
+  url += `&destination=${encodeURIComponent(destination)}`;
+  url += `&travelmode=driving`;
+  if (waypoints) {
+    url += `&waypoints=${encodeURIComponent(waypoints)}`;
+  }
+  return url;
+}
+
 export default function MapScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const mapRef = useRef(null);
@@ -106,6 +122,7 @@ export default function MapScreen({ navigation, route }) {
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [routeSummary, setRouteSummary] = useState({ distanceKm: 0, durationMin: 0, legs: 0 });
   const [selectedRouteIds, setSelectedRouteIds] = useState([]);
+  const [routeViewMode, setRouteViewMode] = useState('pair');
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState('');
   const [permissionDenied, setPermissionDenied] = useState(false);
@@ -128,6 +145,17 @@ export default function MapScreen({ navigation, route }) {
         .filter(Boolean),
     [markers, selectedRouteIds],
   );
+  const itineraryRoutePoints = useMemo(
+    () => markers.filter(hasValidLocation).map((item) => ({ lat: item.location.lat, lng: item.location.lng })),
+    [markers],
+  );
+  const activeRoutePoints = useMemo(() => {
+    if (routeViewMode === 'full') {
+      return itineraryRoutePoints;
+    }
+
+    return selectedRoutePoints.map((item) => ({ lat: item.location.lat, lng: item.location.lng }));
+  }, [itineraryRoutePoints, routeViewMode, selectedRoutePoints]);
   const selectedDistanceValue = useMemo(
     () => DISTANCE_FILTERS.find((item) => item.key === selectedDistance)?.value ?? null,
     [selectedDistance],
@@ -207,6 +235,7 @@ export default function MapScreen({ navigation, route }) {
     setRouteError('');
     setRouteLoading(false);
     setSelectedRouteIds([]);
+    setRouteViewMode('pair');
     setSelectedCategory('all');
     setSelectedDistance('all');
 
@@ -234,6 +263,7 @@ export default function MapScreen({ navigation, route }) {
       setMapMode('itinerary');
       setRouteError('');
       setSelectedRouteIds([]);
+      setRouteViewMode('pair');
       setSelectedCategory('all');
       setSelectedDistance('all');
 
@@ -274,7 +304,7 @@ export default function MapScreen({ navigation, route }) {
   useEffect(() => {
     if (routeMode !== 'itinerary') return;
 
-    if (selectedRoutePoints.length !== 2) {
+    if (activeRoutePoints.length < 2) {
       setRouteCoordinates([]);
       setRouteSummary({ distanceKm: 0, durationMin: 0, legs: 0 });
       setRouteError('');
@@ -289,25 +319,32 @@ export default function MapScreen({ navigation, route }) {
       setRouteError('');
 
       try {
-        const points = selectedRoutePoints.map((item) => ({ lat: item.location.lat, lng: item.location.lng }));
-        const routeData = await getRoute(points);
-        const encoded = routeData.routes?.[0]?.overview_polyline?.points;
-        if (!encoded) {
-          throw new Error('Missing overview polyline');
-        }
+        const buildSingleRoute = async (points) => {
+          const routeData = await getRoute(points);
+          const encoded = routeData.routes?.[0]?.overview_polyline?.points;
+          if (!encoded) throw new Error('Missing overview polyline');
 
-        const decoded = polyline.decode(encoded).map(([latitude, longitude]) => ({
-          latitude,
-          longitude,
-        }));
+          const decoded = polyline.decode(encoded).map(([latitude, longitude]) => ({
+            latitude,
+            longitude,
+          }));
+
+          return {
+            coordinates: decoded,
+            summary: getRouteSummary(routeData, points),
+          };
+        };
+
+        const points = activeRoutePoints;
+        const single = await buildSingleRoute(points);
 
         if (active) {
-          setRouteCoordinates(decoded);
-          setRouteSummary(getRouteSummary(routeData, points));
+          setRouteCoordinates(single.coordinates);
+          setRouteSummary(single.summary);
         }
       } catch {
         if (active) {
-          const points = selectedRoutePoints.map((item) => ({ lat: item.location.lat, lng: item.location.lng }));
+          const points = activeRoutePoints;
           const fallbackCoordinates = getFallbackPolyline(points);
           setRouteCoordinates(fallbackCoordinates);
           setRouteSummary(getRouteSummary(null, points));
@@ -325,7 +362,7 @@ export default function MapScreen({ navigation, route }) {
     return () => {
       active = false;
     };
-  }, [routeMode, selectedRoutePoints]);
+  }, [activeRoutePoints, routeMode]);
 
   useEffect(() => {
     if (!mapRef.current || routeCoordinates.length < 2) return;
@@ -395,6 +432,7 @@ export default function MapScreen({ navigation, route }) {
     }
 
     setRouteError('');
+    setRouteViewMode('pair');
     setSelectedRouteIds((current) => {
       if (current.length === 0) {
         return [experience.id];
@@ -414,9 +452,27 @@ export default function MapScreen({ navigation, route }) {
 
   const clearRouteSelection = () => {
     setSelectedRouteIds([]);
+    setRouteViewMode('pair');
     setRouteCoordinates([]);
     setRouteSummary({ distanceKm: 0, durationMin: 0, legs: 0 });
     setRouteError('');
+  };
+
+  const showFullRouteSummary = () => {
+    setRouteViewMode('full');
+  };
+
+  const openGoogleMapsDirections = async (pointsArg) => {
+    const points = Array.isArray(pointsArg) ? pointsArg : itineraryRoutePoints;
+
+    const url = buildGoogleMapsDirectionsUrl(points);
+    if (!url) return;
+
+    try {
+      await Linking.openURL(url);
+    } catch {
+      setRouteError('Không mở được Google Maps.');
+    }
   };
 
   if (loading) {
@@ -526,48 +582,50 @@ export default function MapScreen({ navigation, route }) {
           <View style={[styles.routePicker, { bottom: insets.bottom + 72 }]}>
             <View style={styles.routePickerHeader}>
               <View style={styles.routePickerHeaderText}>
-                <Text style={styles.routePickerTitle}>Chọn 2 điểm để xem đường đi</Text>
+                <Text style={styles.routePickerTitle}>Chọn 2 điểm trên map</Text>
                 <Text style={styles.routePickerHint}>
                   {selectedRoutePoints.length === 0
                     ? 'Chạm vào một địa điểm để chọn điểm đầu.'
                     : selectedRoutePoints.length === 1
                       ? `Đã chọn ${selectedRoutePoints[0]?.title}. Chọn điểm thứ hai.`
-                      : `Đang xem ${selectedRoutePoints[0]?.title} → ${selectedRoutePoints[1]?.title}.`}
+                      : `Đã chọn ${selectedRoutePoints[0]?.title} và ${selectedRoutePoints[1]?.title}.`}
                 </Text>
               </View>
-              <Button mode="text" compact onPress={clearRouteSelection}>
-                Xóa chọn
-              </Button>
+              <View style={styles.routePickerActions}>
+                <Button mode="contained" compact style={styles.routeActionButton} onPress={showFullRouteSummary}>
+                  Toàn tuyến
+                </Button>
+                <Button mode="text" compact style={styles.routeActionButton} onPress={clearRouteSelection}>
+                  Xóa lựa chọn
+                </Button>
+              </View>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.routeChipRow}>
-              {displayedMarkers.map((experience) => {
-                const isFirst = selectedRouteIds[0] === experience.id;
-                const isSecond = selectedRouteIds[1] === experience.id;
-                return (
-                  <Pressable
-                    key={experience.id}
-                    style={[
-                      styles.routeChip,
-                      isFirst && styles.routeChipFirst,
-                      isSecond && styles.routeChipSecond,
-                    ]}
-                    onPress={() => handleMarkerPress(experience)}
-                  >
-                    <Text style={styles.routeChipText}>
-                      {isFirst ? 'A: ' : isSecond ? 'B: ' : ''}
-                      {experience.title}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
             {routeCoordinates.length >= 2 ? (
               <View style={styles.routeResult}>
                 <Text style={styles.routeResultText}>
-                  Khoảng cách: ~{routeSummary.distanceKm.toFixed(1)} km
+                  {routeViewMode === 'full' ? 'Tổng quãng đường' : 'Khoảng cách'}: ~{routeSummary.distanceKm.toFixed(1)} km
                   {routeSummary.durationMin > 0 ? ` · ~${Math.round(routeSummary.durationMin)} phút` : ''}
                 </Text>
               </View>
+            ) : null}
+            {selectedRoutePoints.length >= 2 ? (
+              <Button
+                mode="contained"
+                icon="google-maps"
+                buttonColor={colors.secondary}
+                textColor={colors.background}
+                style={styles.routeOpenButton}
+                onPress={() =>
+                  openGoogleMapsDirections(
+                    selectedRoutePoints.map((item) => ({
+                      lat: item.location.lat,
+                      lng: item.location.lng,
+                    })),
+                  )
+                }
+              >
+                Xem đường đi
+              </Button>
             ) : null}
           </View>
         ) : null}
@@ -669,6 +727,11 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.sm,
   },
+  routePickerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   routePickerHeaderText: {
     flex: 1,
     gap: 2,
@@ -707,6 +770,13 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.text,
     fontWeight: '600',
+  },
+  routeActionButton: {
+    flex: 1,
+  },
+  routeOpenButton: {
+    marginTop: spacing.sm,
+    borderRadius: 12,
   },
   routeResult: {
     marginTop: spacing.sm,
